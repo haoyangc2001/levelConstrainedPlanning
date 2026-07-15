@@ -43,3 +43,16 @@ python tools/learning/diffusion_seed_learning/evaluate.py \
 ```
 
 The old lifecycle exporters remain for compatibility with historical `tashan_Manipulation` logs. New data collection should prefer the standalone CLI/core result artifacts.
+
+## Pointer Fields
+
+`artifacts/current_artifacts.json` records:
+
+- `dataset.training_dataset`: phase10 validated JSONL path.
+- `dataset.dataset_manifest`: phase10 manifest path and hash.
+- `diffusion.best_checkpoint`: current diffusion seed checkpoint.
+- `critic.best_checkpoint`: current success critic checkpoint.
+- `generated_samples`: offline generated seed report.
+- `offline_generation_report`: seed-level evaluation report.
+
+Only this pointer is committed. Large files remain under `/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning`.
