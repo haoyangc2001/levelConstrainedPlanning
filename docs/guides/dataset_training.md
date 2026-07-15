@@ -12,6 +12,14 @@ Large generated artifacts stay outside git under:
 /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning
 ```
 
+This workflow serves the project mainline:
+
+```text
+data generation -> model learning -> optimization validation -> failure fallback -> data update
+```
+
+Dataset records should therefore preserve successes, failed seeds, fallback outcomes, validation metrics, and optimizer costs. Training only on polished final trajectories is not enough; the system needs evidence about which seeds are repairable, which ones fail, and why.
+
 Check external artifact pointers:
 
 ```bash

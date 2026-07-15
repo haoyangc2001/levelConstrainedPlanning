@@ -16,6 +16,18 @@ request JSON/YAML
 -> result JSON + trajectory artifacts
 ```
 
+## Project Mainline
+
+The project mainline is the closed-loop evolution system:
+
+```text
+data generation -> model learning -> optimization validation -> failure fallback -> data update
+```
+
+In Chinese design terms: `数据生成 - 模型学习 - 优化验收 - 失败回退 - 数据更新`.
+
+The planner is the executable core of that loop. Rule-based seed families and CuRobo validation generate reliable training/evaluation data; diffusion and critic models learn better seed distributions from that data; every learned candidate still returns to CuRobo repair, hard validation, fallback handling, and dataset update.
+
 ## Boundary
 
 This repository is not the full robot product stack. The core package must not depend on:
@@ -51,6 +63,8 @@ The Markdown documents under `docs/` are split by role:
 - `docs/reference/`: stable request/result schema and interface reference.
 - `docs/design/`: original design notes for constrained trajectory optimization and diffusion seed learning.
 - `docs/reports/`: phase or source-project reports that record completed experiments and model status.
+
+Start from `docs/guides/project_mainline.md` when checking whether a new tool or model change follows the intended project direction.
 
 ## Main Entrypoint
 

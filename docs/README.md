@@ -2,8 +2,17 @@
 
 This directory keeps project documentation grouped by purpose instead of mixing all Markdown files in one flat folder.
 
+The project mainline is the closed-loop evolution system:
+
+```text
+data generation -> model learning -> optimization validation -> failure fallback -> data update
+```
+
+Use `guides/project_mainline.md` as the first document for understanding the intended direction.
+
 ## Guides
 
+- `guides/project_mainline.md`: top-level closed-loop project direction and engineering contract.
 - `guides/environment.md`: machine, conda, ROS, CuRobo, and headless validation environment.
 - `guides/runtime.md`: planner runtime behavior and CLI/Python entrypoints.
 - `guides/dataset_training.md`: dataset export, artifact pointers, and diffusion/critic training workflow.
