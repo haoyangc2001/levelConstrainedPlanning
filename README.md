@@ -38,9 +38,19 @@ configs/                 SR5 robot/world/planner config
 examples/requests/       success, alignment-hard, planner-fail fixtures
 tools/                   asset checks, dataset export, diffusion learning tools
 artifacts/               pointer JSON only; no large data/checkpoints
+docs/                   design notes, user guides, API reference, reports
 reports/                 committed smoke/validation summaries
 scripts/                 headless validation entrypoints
 ```
+
+## Documentation
+
+The Markdown documents under `docs/` are split by role:
+
+- `docs/guides/`: environment setup, runtime usage, dataset/training workflow, and optional ROS adapter usage.
+- `docs/reference/`: stable request/result schema and interface reference.
+- `docs/design/`: original design notes for constrained trajectory optimization and diffusion seed learning.
+- `docs/reports/`: phase or source-project reports that record completed experiments and model status.
 
 ## Main Entrypoint
 
