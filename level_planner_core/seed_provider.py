@@ -94,6 +94,7 @@ class SeedCandidate:
                     len(self.trajectory_points),
                     len(self.trajectory_points[0]) if self.trajectory_points else 0,
                 ],
+                "points": self.trajectory_points,
             },
             "metadata": dict(self.metadata),
             "precheck": dict(self.precheck),

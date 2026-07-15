@@ -398,15 +398,15 @@
       "id": 3,
       "name": "规则化水平种子族迁入 standalone core",
       "priority": "P0",
-      "status": "not_started",
-      "completed": false,
+      "status": "completed",
+      "completed": true,
       "objective": "把源项目已验证的规则化水平种子能力迁入轻量项目，作为离线产数主力和在线 fallback 基线。",
       "tasks": [
         {
           "id": "3.1",
           "description": "实现 RuleSeedProvider 基础框架。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "0.3",
             "1.1"
@@ -420,8 +420,8 @@
         {
           "id": "3.2",
           "description": "迁入基准水平种子生成。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "3.1"
           ],
@@ -434,8 +434,8 @@
         {
           "id": "3.3",
           "description": "迁入 IK anchor、twist delayed、in-limit-best 变体。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "3.2"
           ],
@@ -448,8 +448,8 @@
         {
           "id": "3.4",
           "description": "迁入分段、平滑和桥接候选。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed_with_phase4_split_deferral",
+          "completed": true,
           "depends_on": [
             "3.3",
             "2.3"
@@ -463,8 +463,8 @@
         {
           "id": "3.5",
           "description": "建立 rule seed 回归矩阵。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "3.4"
           ],
@@ -484,6 +484,24 @@
         "rule_seed 不再报告 not_generated_in_phase3_minimal_core。",
         "规则种子候选能完整进入 lifecycle artifacts。",
         "至少一个 fixture 展示 rule seed 候选经过 hard validator。"
+      ],
+      "actual_outputs": [
+        "level_planner_core/rule_seed.py 新增 RuleLevelSeedProvider 和四个规则 family 配置。",
+        "level_planner_core/planner.py 接入 rule seed provider、CuRobo FK/IK wrapper 和 provider candidate -> CandidateRecord 转换。",
+        "level_planner_core/seed_provider.py 的 lifecycle candidate trajectory 增加 points，支持 provider raw seed 回流 dataset。",
+        "configs/sr5_level.yaml 新增 rule_seed_num_waypoints、rule_seed_ik_return_seeds、smooth/bridge 配置。",
+        "tests/test_rule_seed.py 覆盖 fake FK/IK 下的 raw rule seed 生成。",
+        "docs/reports/rule_seed_phase3_smoke_report.md",
+        "runs/phase3_rule_seed_variants_smoke/candidate_samples.jsonl",
+        "runs/phase3_rule_seed_planner_fail_smoke/candidate_samples.jsonl"
+      ],
+      "verification": [
+        "python3 -m compileall level_planner_core level_planner tools tests",
+        "PYTHONPATH=$PWD PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q tests/test_candidate_dataset.py tests/test_import_smoke.py tests/test_constraints_smoke.py tests/test_validators.py tests/test_rule_seed.py",
+        "phase3_rule_seed_variants_smoke 生成 raw/smoothed/bridged 三条 30x6 rule_raw_seed，并导出为 3 条未 repair 负样本。",
+        "phase3_rule_seed_planner_fail_smoke 中 planner native failed_planner，但 rule provider 仍生成 3 条 30x6 raw seed 候选。",
+        "TrajectorySeedDataset 与 SuccessCriticDataset 可读取 Phase 3 variants smoke 数据。",
+        "split/cspace repair 依赖 Phase 4 SeedRepairAdapter，Phase 3 已在 metadata 中标记 split_status=deferred_to_phase4_cspace_repair。"
       ]
     },
     {

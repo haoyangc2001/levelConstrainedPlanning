@@ -27,6 +27,7 @@ from .result_schema import (
     STATUS_SUCCESS,
 )
 from .robot_assets import resolve_robot_config
+from .rule_seed import RuleLevelSeedProvider, RuleSeedProviderConfig
 from .seed_provider import (
     DiffusionSeedProviderConfig,
     FileDiffusionSeedProvider,
@@ -61,6 +62,11 @@ class LevelPlannerConfig:
     max_joint_step_l2: float = 2.0
     max_joint_step_abs: float = 1.5
     max_acceleration_proxy_l2: float = 3.0
+    rule_seed_num_waypoints: int = 30
+    rule_seed_ik_return_seeds: int = 32
+    rule_seed_include_smooth_bridge_variants: bool = True
+    rule_seed_smoothing_passes: int = 2
+    rule_seed_bridge_radius: int = 2
     diffusion_generated_samples_path: str = (
         "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/"
         "sr5_phase10_mature_diffusion_20260715_generated_samples.json"
@@ -107,6 +113,11 @@ class LevelPlannerConfig:
             "max_joint_step_l2",
             "max_joint_step_abs",
             "max_acceleration_proxy_l2",
+            "rule_seed_num_waypoints",
+            "rule_seed_ik_return_seeds",
+            "rule_seed_include_smooth_bridge_variants",
+            "rule_seed_smoothing_passes",
+            "rule_seed_bridge_radius",
             "diffusion_generated_samples_path",
             "diffusion_checkpoint_path",
         ):
@@ -286,15 +297,50 @@ class LevelConstrainedPlanner:
         mode = policy["mode"]
         reports: list[dict[str, Any]] = []
 
-        rule_report = {
-            "provider": "rule_seed",
-            "provider_name": "rule_seed",
-            "mode": "fallback_available" if policy.get("fallback_to_rule_seed") else "disabled",
-            "status": "not_generated_in_phase3_minimal_core",
-            "generated_count": 0,
-            "accepted_count": 0,
-            "runtime_effect": "planner_native_seed_path_is_used_first",
-        }
+        if policy.get("fallback_to_rule_seed"):
+            rule_provider = RuleLevelSeedProvider(
+                RuleSeedProviderConfig(
+                    mode="candidate" if int(policy.get("k_generate") or 0) > 0 else "available",
+                    k_generate=int(policy.get("k_generate") or 0),
+                    k_accept=int(policy.get("k_accept") or policy.get("k_generate") or 0),
+                    timeout_sec=float(policy.get("timeout_sec") or 1.0),
+                    num_waypoints=int(self.config.rule_seed_num_waypoints),
+                    ik_return_seeds=int(self.config.rule_seed_ik_return_seeds),
+                    include_smooth_bridge_variants=bool(
+                        self.config.rule_seed_include_smooth_bridge_variants
+                    ),
+                    smoothing_passes=int(self.config.rule_seed_smoothing_passes),
+                    bridge_radius=int(self.config.rule_seed_bridge_radius),
+                ),
+                fk_pose_fn=self._fk_pose_for_joint,
+                ik_solve_fn=self._ik_solve_pose_candidates,
+            )
+            rule_result = rule_provider.generate(
+                {
+                    "start_joint": request["start_joint"],
+                    "target_pose": request["target_pose"],
+                    "alignment": request["alignment"],
+                    "dof": len(self._joint_names),
+                    "joint_names": list(self._joint_names),
+                    "tool_frames": list(self._tool_frames),
+                }
+            )
+            rule_report = rule_result.to_lifecycle_dict()
+            rule_report["provider"] = rule_report.get("provider_name", "rule_seed")
+            rule_report["accepted_count"] = int(
+                sum(1 for c in rule_report.get("candidates", []) if c.get("precheck", {}).get("valid"))
+            )
+            rule_report["runtime_effect"] = "raw_rule_seed_report_only_until_phase4_repair_pool"
+        else:
+            rule_report = {
+                "provider": "rule_seed",
+                "provider_name": "rule_seed",
+                "mode": "disabled",
+                "status": "disabled",
+                "generated_count": 0,
+                "accepted_count": 0,
+                "runtime_effect": "disabled_by_seed_policy",
+            }
         reports.append(rule_report)
 
         diffusion_mode = "off"
@@ -337,6 +383,62 @@ class LevelConstrainedPlanner:
         )
         reports.append(provider_report)
         return reports
+
+    def _fk_pose_for_joint(self, joint_position: list[float]) -> list[float]:
+        from curobo.types import JointState as CuJointState
+
+        state = CuJointState.from_position(
+            torch.tensor([joint_position], device=self.device, dtype=torch.float32),
+            joint_names=self._joint_names,
+        )
+        kin_state = self._planner.compute_kinematics(state)
+        tool_pose = kin_state.tool_poses.get_link_pose(self._tool_frames[0])
+        pos = tool_pose.position.reshape(-1, 3)[0].detach().cpu().tolist()
+        quat = tool_pose.quaternion.reshape(-1, 4)[0].detach().cpu().tolist()
+        return [float(v) for v in pos + quat]
+
+    def _ik_solve_pose_candidates(
+        self,
+        position: list[float],
+        quaternion: list[float],
+        prev_solution: torch.Tensor,
+        return_seeds: int,
+    ) -> list[torch.Tensor]:
+        from curobo.types import GoalToolPose, JointState as CuJointState
+
+        quat = constraints.normalize_quaternion(quaternion)
+        goal = GoalToolPose(
+            tool_frames=self._tool_frames,
+            position=torch.tensor(
+                [[[[[position[0], position[1], position[2]]]]]],
+                device=self.device,
+                dtype=torch.float32,
+            ),
+            quaternion=torch.tensor(
+                [[[[[quat[0], quat[1], quat[2], quat[3]]]]]],
+                device=self.device,
+                dtype=torch.float32,
+            ),
+        )
+        prev = prev_solution.to(device=self.device, dtype=torch.float32).reshape(1, -1)
+        current_state = CuJointState.from_position(prev, joint_names=self._joint_names)
+        seed_config = prev.reshape(1, 1, -1)
+        if hasattr(self._planner.ik_solver, "reset_seed"):
+            self._planner.ik_solver.reset_seed()
+        result = self._planner.ik_solver.solve_pose(
+            goal,
+            current_state=current_state,
+            seed_config=seed_config,
+            return_seeds=int(return_seeds),
+        )
+        feasible = getattr(result, "feasible", None)
+        if feasible is None:
+            feasible = getattr(result, "success", None)
+        if feasible is None or not bool(feasible.any().item()):
+            return []
+        batch_idx, seed_idx = feasible.nonzero(as_tuple=True)
+        solutions = result.solution[batch_idx, seed_idx]
+        return [solutions[index].detach().cpu().to(dtype=torch.float32) for index in range(int(solutions.shape[0]))]
 
     def _collect_planner_candidates(self, request: dict[str, Any]) -> tuple[list[torch.Tensor], list[dict[str, Any]]]:
         from curobo.types import GoalToolPose, JointState as CuJointState
@@ -595,6 +697,12 @@ class LevelConstrainedPlanner:
                 )
                 for item in result.candidates
             ]
+        self._append_provider_candidate_records(
+            result=result,
+            run_id=run_id,
+            start_joint=start_joint,
+            alignment_tolerance_deg=alignment_tolerance,
+        )
 
         selected_candidate_id = result.metrics.get("selected_candidate_id")
         if not selected_candidate_id:
@@ -758,6 +866,97 @@ class LevelConstrainedPlanner:
             failure_reason=failure_reason,
             metrics=metrics,
         ).to_dict()
+
+    def _append_provider_candidate_records(
+        self,
+        *,
+        result: PlannerResult,
+        run_id: str,
+        start_joint: list[float],
+        alignment_tolerance_deg: float,
+    ) -> None:
+        existing_ids = {str(item.get("candidate_id")) for item in result.candidate_records}
+        for report in result.seed_provider_reports:
+            provider_name = str(report.get("provider") or report.get("provider_name") or "seed_provider")
+            provider_mode = str(report.get("mode") or "unknown")
+            for candidate in report.get("candidates", []) or []:
+                candidate_id = str(candidate.get("candidate_id") or "")
+                if not candidate_id or candidate_id in existing_ids:
+                    continue
+                trajectory = (candidate.get("trajectory") or {})
+                points = trajectory.get("points") or []
+                source_type = self._normalize_source_type(candidate.get("source_type"))
+                optimizer_success = False
+                metrics = dict(candidate.get("metrics") or {})
+                validator_metrics = validators.evaluate_hard_constraints(
+                    trajectory_points=points,
+                    start_joint=start_joint,
+                    joint_limits=self._joint_limits,
+                    metrics=metrics,
+                    alignment_tolerance_deg=float(alignment_tolerance_deg),
+                    optimizer_success=optimizer_success,
+                    world_summary=self._world_summary,
+                    thresholds=self._validator_thresholds(),
+                )
+                failure_reason = (
+                    candidate.get("precheck", {}).get("failure_reason")
+                    or "not_repaired_in_phase3"
+                )
+                record = CandidateRecord(
+                    candidate_id=candidate_id,
+                    run_id=run_id,
+                    request_id=result.request_id,
+                    source_lineage={
+                        "source_type": source_type,
+                        "source_label": candidate.get("source_label"),
+                        "provider": provider_name,
+                        "provider_mode": provider_mode,
+                        "rule_family_name": (candidate.get("metadata") or {}).get("seed_family_name"),
+                        "rule_family_config": (candidate.get("metadata") or {}).get("seed_family_config"),
+                    },
+                    trajectory={
+                        "format": trajectory.get("format", "joint_position_rad"),
+                        "shape": trajectory.get("shape") or [
+                            len(points),
+                            len(points[0]) if points else 0,
+                        ],
+                        "points": points,
+                    },
+                    lifecycle={
+                        "generated": True,
+                        "precheck_passed": bool((candidate.get("precheck") or {}).get("valid")),
+                        "entered_pool": bool(candidate.get("entered_pool", False)),
+                        "repair_attempted": False,
+                        "repair_success": False,
+                        "hard_validation_attempted": bool(points),
+                        "hard_validation_passed": False,
+                        "selected": False,
+                        "fallback_recovered": False,
+                    },
+                    precheck=dict(candidate.get("precheck") or {}),
+                    optimizer_result={
+                        "status": "not_repaired_in_phase3",
+                        "success": False,
+                        "failure_reason": "not_repaired_in_phase3",
+                    },
+                    validator_metrics=validator_metrics,
+                    labels={
+                        "planner_status": result.status,
+                        "candidate_status": "not_repaired_in_phase3",
+                        "failure_reason": failure_reason,
+                        "selected": False,
+                        "validator_valid": False,
+                        "positive_for_diffusion": False,
+                        "positive_for_critic": False,
+                        "negative_for_critic": True,
+                        "fallback_recovered": False,
+                    },
+                    failure_stage="repair",
+                    failure_reason=failure_reason,
+                    metrics=metrics,
+                ).to_dict()
+                result.candidate_records.append(record)
+                existing_ids.add(candidate_id)
 
     def _validator_thresholds(self) -> dict[str, float]:
         return {
