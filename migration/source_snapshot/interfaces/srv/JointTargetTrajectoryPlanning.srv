@@ -1,0 +1,6 @@
+sensor_msgs/JointState target_joint_position
+float32 speed_scale
+---
+bool success
+string message
+trajectory_msgs/JointTrajectory joint_trajectory

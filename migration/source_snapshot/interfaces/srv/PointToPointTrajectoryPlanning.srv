@@ -1,0 +1,16 @@
+geometry_msgs/Pose target_pose
+std_msgs/Int32[] hold_vec_weight
+float32 speed_scale
+int32 auto_prealign_mode
+# [caohy] 阶段 2：新增水平约束候选筛选参数，默认值保持向后兼容
+# use_level_first_selection=false 时走原有 plan_single 逻辑，true 时走 plan_single_level_constrained
+# level_tolerance_deg=0 表示不检查水平，num_candidates<=1 时等同于单候选
+float32 level_tolerance_deg
+bool strict_level
+int32 num_candidates
+bool use_level_first_selection
+bool enable_alignment_seed
+---
+bool success
+string message
+trajectory_msgs/JointTrajectory joint_trajectory

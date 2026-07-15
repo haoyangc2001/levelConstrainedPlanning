@@ -1,0 +1,363 @@
+{
+  "schema_version": "1.0",
+  "status": "completed",
+  "source_repo_root": "/home/caohy/repositories/tashan_Manipulation",
+  "target_repo_root": "/home/caohy/repositories/sr5_level_constrained_planning",
+  "manifest_path": "/home/caohy/repositories/tashan_Manipulation/readCaohy/plans/standaloneLevelPlanning/migration/extraction_manifest.json",
+  "copied_file_count": 44,
+  "copied_size_bytes": 8774483,
+  "copied_files": [
+    {
+      "source_path": "src/curobo_v2_planner/curobo_v2_planner/main.py",
+      "target_path": "migration/source_snapshot/curobo_v2_planner/main.py",
+      "role": "source_reference",
+      "copy_mode": "file",
+      "size_bytes": 535825,
+      "sha256": "eb5cdcd71865bcae6081fe1be5d73d029b22de93eff9993fe676b6e677bea30e"
+    },
+    {
+      "source_path": "src/curobo_v2_planner/curobo_v2_planner/constraint_utils.py",
+      "target_path": "level_planner_core/constraints.py",
+      "role": "core",
+      "copy_mode": "file",
+      "size_bytes": 23196,
+      "sha256": "0860664280e1e7af14e01cdda2ea738c5e6f283a705af1dd48417fcfda4e82da"
+    },
+    {
+      "source_path": "src/curobo_v2_planner/curobo_v2_planner/seed_provider.py",
+      "target_path": "level_planner_core/seed_provider.py",
+      "role": "core",
+      "copy_mode": "file",
+      "size_bytes": 15920,
+      "sha256": "16643e59dc3145391988e27ff2637ddcb9bf3fa7adee9e87f9cdf5ca12059475"
+    },
+    {
+      "source_path": "src/curobo_v2_planner/curobo_v2_planner/rokae_asset_utils.py",
+      "target_path": "level_planner_core/robot_assets.py",
+      "role": "core",
+      "copy_mode": "file",
+      "size_bytes": 6228,
+      "sha256": "814dd740b29b1a6998bd958576ac440d370fcf04563be13785313049263f1e57"
+    },
+    {
+      "source_path": "src/curobo_v2_planner/curobo_v2_planner/rokae_world_utils.py",
+      "target_path": "level_planner_core/world.py",
+      "role": "core",
+      "copy_mode": "file",
+      "size_bytes": 5392,
+      "sha256": "ca2c999a1c8dd05b2116268459f605f398344a2b563ad73a441ce47f7e8733a4"
+    },
+    {
+      "source_path": "src/curobo_v2_planner/curobo_v2_planner/trajectory_seed_inference_node.py",
+      "target_path": "migration/source_snapshot/curobo_v2_planner/trajectory_seed_inference_node.py",
+      "role": "ros_adapter_reference",
+      "copy_mode": "file",
+      "size_bytes": 4034,
+      "sha256": "c0e08a244e514278e26894046306ce3154778b9d6bbd70f9857d4fd76945e4d6"
+    },
+    {
+      "source_path": "src/interfaces/srv/PointToPointTrajectoryPlanning.srv",
+      "target_path": "migration/source_snapshot/interfaces/srv/PointToPointTrajectoryPlanning.srv",
+      "role": "ros_adapter_reference",
+      "copy_mode": "file",
+      "size_bytes": 601,
+      "sha256": "e39442edb5aa226b23a479c916f8ab9d25891b20ab81ca69b096d1346ebeaf97"
+    },
+    {
+      "source_path": "src/interfaces/srv/JointTargetTrajectoryPlanning.srv",
+      "target_path": "migration/source_snapshot/interfaces/srv/JointTargetTrajectoryPlanning.srv",
+      "role": "ros_adapter_reference",
+      "copy_mode": "file",
+      "size_bytes": 146,
+      "sha256": "64d7d0826d9b6b173500c5186acab8bd4e8ad84bbcac069fe22acb4e294e3a0f"
+    },
+    {
+      "source_path": "src/interfaces/srv/TargetPose.srv",
+      "target_path": "migration/source_snapshot/interfaces/srv/TargetPose.srv",
+      "role": "ros_adapter_reference",
+      "copy_mode": "file",
+      "size_bytes": 203,
+      "sha256": "979bd59bc60e6218b4be19dc632aad8933aa06b1242c1a7e587dacb868ee866d"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/start.launch.yaml",
+      "target_path": "migration/source_snapshot/Level_Test_V2_caohy/start.launch.yaml",
+      "role": "config_reference",
+      "copy_mode": "file",
+      "size_bytes": 15702,
+      "sha256": "e88d3c52267967e13ecbf348ac2f7238425d1af63f698b6ce4fc31d16ecaca3a"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/robot/xms5_r800_w4g3b4c_v2.yml",
+      "target_path": "configs/robot/xms5_r800_w4g3b4c_v2.yml",
+      "role": "robot_config",
+      "copy_mode": "file",
+      "size_bytes": 2198,
+      "sha256": "eb9e0f55e37798c0a6b1a6cb7a3e83ea7213dc640cb95f46f9339818e9526512"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/robot/curobo/xms5_r800_w4g3b4c.urdf",
+      "target_path": "configs/robot/curobo/xms5_r800_w4g3b4c.urdf",
+      "role": "robot_asset",
+      "copy_mode": "file",
+      "size_bytes": 11233,
+      "sha256": "4e0288ac88042652518754d55fc0879b6c6b3acb2714413bd976f7fd62179132"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_base.stl",
+      "target_path": "configs/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_base.stl",
+      "role": "robot_asset",
+      "copy_mode": "directory",
+      "size_bytes": 1198284,
+      "sha256": "b9478e76c8d1b0d24fe12d882dbb9ba1ac6e57705508ebff100a1bdc11ff112c"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_link1.stl",
+      "target_path": "configs/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_link1.stl",
+      "role": "robot_asset",
+      "copy_mode": "directory",
+      "size_bytes": 1051384,
+      "sha256": "86852a57cff01290e9edbd629ca3a71814f72431d111aab320a1c5aadae13e4b"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_link2.stl",
+      "target_path": "configs/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_link2.stl",
+      "role": "robot_asset",
+      "copy_mode": "directory",
+      "size_bytes": 2085984,
+      "sha256": "b38d698ebbc7a477e16aefd229bdfa5901d58124c3970fe22f73dc2bcd59e7af"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_link3.stl",
+      "target_path": "configs/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_link3.stl",
+      "role": "robot_asset",
+      "copy_mode": "directory",
+      "size_bytes": 1191884,
+      "sha256": "4baef261ecd000e2fcf9e5756e4e4098bdac83c0344d4bc3a7866ac16f18f844"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_link4.stl",
+      "target_path": "configs/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_link4.stl",
+      "role": "robot_asset",
+      "copy_mode": "directory",
+      "size_bytes": 748384,
+      "sha256": "b9cc7f7afdd20880f10b2d0068e2bd9fcb60539a0fc70df2aa6fed489cab59fd"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_link5.stl",
+      "target_path": "configs/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_link5.stl",
+      "role": "robot_asset",
+      "copy_mode": "directory",
+      "size_bytes": 1094884,
+      "sha256": "36e443698f8440557650eb2baf2406aa64ce3f157d8b32388d43f82769780a74"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_link6.stl",
+      "target_path": "configs/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes/XMS5-R800-W4G3B4C_link6.stl",
+      "role": "robot_asset",
+      "copy_mode": "directory",
+      "size_bytes": 611584,
+      "sha256": "bc1ef9ee293c350ffa3118bf97893130079e8da6fc2f6d73f2679bce93e9f16a"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/robot/spheres/xms5_r800_w4g3b4c_spherized.yml",
+      "target_path": "configs/robot/spheres/xms5_r800_w4g3b4c_spherized.yml",
+      "role": "robot_asset",
+      "copy_mode": "file",
+      "size_bytes": 8150,
+      "sha256": "97a0b3ffd0764ef35572522767f88614c918dcde34aad5d1a92ad3fa1f458190"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/obstacles/abs.autosave.json",
+      "target_path": "configs/obstacles/abs.autosave.json",
+      "role": "world_config",
+      "copy_mode": "file",
+      "size_bytes": 1907,
+      "sha256": "5f1ffc0f6f8ea8f62780d7b48d58b829bd87fd7b0e90fd4f323ee9bfb876185b"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/obstacles/rel.autosave.json",
+      "target_path": "configs/obstacles/rel.autosave.json",
+      "role": "world_config",
+      "copy_mode": "file",
+      "size_bytes": 447,
+      "sha256": "1993af7624dec87bdce9a4e9732e1eb53be273ff7ceac9d971fb3283d2ffdec2"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/device_relative_points.yaml",
+      "target_path": "migration/source_snapshot/Level_Test_V2_caohy/device_relative_points.yaml",
+      "role": "fixture_reference",
+      "copy_mode": "file",
+      "size_bytes": 1577,
+      "sha256": "51d9d1a1ffefa2f9eec1f7f48277d73d0e8fba2e059993fa1e3fede906a14728"
+    },
+    {
+      "source_path": "resource/config/Level_Test_V2_caohy/slot_routes.yaml",
+      "target_path": "migration/source_snapshot/Level_Test_V2_caohy/slot_routes.yaml",
+      "role": "fixture_reference",
+      "copy_mode": "file",
+      "size_bytes": 4536,
+      "sha256": "916787dc9c35266cb639a6c73915c13f44d91e303babef0389bcf99a53431124"
+    },
+    {
+      "source_path": "readCaohy/learning/diffusion_seed_learning/__init__.py",
+      "target_path": "tools/learning/diffusion_seed_learning/__init__.py",
+      "role": "learning_tools",
+      "copy_mode": "directory",
+      "size_bytes": 48,
+      "sha256": "a9e2cc13cea98c5db7e523b587ab7ef8397251aa3068969ae7333719dcc4fe46"
+    },
+    {
+      "source_path": "readCaohy/learning/diffusion_seed_learning/critic.py",
+      "target_path": "tools/learning/diffusion_seed_learning/critic.py",
+      "role": "learning_tools",
+      "copy_mode": "directory",
+      "size_bytes": 12345,
+      "sha256": "7a0b4e3cf89bd22dff51f90340ba0f741d7747eb84392cd4f4e3a639bce0c414"
+    },
+    {
+      "source_path": "readCaohy/learning/diffusion_seed_learning/dataset.py",
+      "target_path": "tools/learning/diffusion_seed_learning/dataset.py",
+      "role": "learning_tools",
+      "copy_mode": "directory",
+      "size_bytes": 4874,
+      "sha256": "9970503c17083f2d5c79144f591f13cdbab7b868958b91a31084f8d258f5992d"
+    },
+    {
+      "source_path": "readCaohy/learning/diffusion_seed_learning/diffusion.py",
+      "target_path": "tools/learning/diffusion_seed_learning/diffusion.py",
+      "role": "learning_tools",
+      "copy_mode": "directory",
+      "size_bytes": 2117,
+      "sha256": "4a930a93f1412fcab0d549a112fdd972305efbdefced672c9689f1b488ddffd3"
+    },
+    {
+      "source_path": "readCaohy/learning/diffusion_seed_learning/evaluate.py",
+      "target_path": "tools/learning/diffusion_seed_learning/evaluate.py",
+      "role": "learning_tools",
+      "copy_mode": "directory",
+      "size_bytes": 4777,
+      "sha256": "51abc9e5b4e537202cc2b357c682c8938b304c588996feb714d873c7bbc5be55"
+    },
+    {
+      "source_path": "readCaohy/learning/diffusion_seed_learning/evaluate_critic.py",
+      "target_path": "tools/learning/diffusion_seed_learning/evaluate_critic.py",
+      "role": "learning_tools",
+      "copy_mode": "directory",
+      "size_bytes": 6108,
+      "sha256": "e47a3baece372896b6cc666b32ae94925222834ffe722270d2fe8b31bcb0bcf2"
+    },
+    {
+      "source_path": "readCaohy/learning/diffusion_seed_learning/model_unet1d.py",
+      "target_path": "tools/learning/diffusion_seed_learning/model_unet1d.py",
+      "role": "learning_tools",
+      "copy_mode": "directory",
+      "size_bytes": 2609,
+      "sha256": "47a16db93da7cea311124b3cb3075067025bc28ee5161cc7431f8c1db8d7b9a5"
+    },
+    {
+      "source_path": "readCaohy/learning/diffusion_seed_learning/sample.py",
+      "target_path": "tools/learning/diffusion_seed_learning/sample.py",
+      "role": "learning_tools",
+      "copy_mode": "directory",
+      "size_bytes": 4476,
+      "sha256": "c84bf411b6fcfc9bf2235f844d726313b8c5df5400e41bdc8168255c8afc745e"
+    },
+    {
+      "source_path": "readCaohy/learning/diffusion_seed_learning/train.py",
+      "target_path": "tools/learning/diffusion_seed_learning/train.py",
+      "role": "learning_tools",
+      "copy_mode": "directory",
+      "size_bytes": 3965,
+      "sha256": "77d1a19cbeb6acbd5a98cff41542c205f5b4052efbb009d3a3988799d383d31a"
+    },
+    {
+      "source_path": "readCaohy/learning/diffusion_seed_learning/train_critic.py",
+      "target_path": "tools/learning/diffusion_seed_learning/train_critic.py",
+      "role": "learning_tools",
+      "copy_mode": "directory",
+      "size_bytes": 5643,
+      "sha256": "19e30493b6f379718143c78636f142650e954a65d2cb97494709be8104349391"
+    },
+    {
+      "source_path": "readCaohy/test/diffusion_seed_learning/benchmark_runner.py",
+      "target_path": "tools/dataset/diffusion_seed_learning/benchmark_runner.py",
+      "role": "dataset_tools",
+      "copy_mode": "directory",
+      "size_bytes": 16681,
+      "sha256": "62ba8b48592080c3b866e00ec2e614749fc59939f486e857b3a74b953093e35d"
+    },
+    {
+      "source_path": "readCaohy/test/diffusion_seed_learning/collect_lifecycle_runs.py",
+      "target_path": "tools/dataset/diffusion_seed_learning/collect_lifecycle_runs.py",
+      "role": "dataset_tools",
+      "copy_mode": "directory",
+      "size_bytes": 20439,
+      "sha256": "fb093cbd121baaff47133a1de0b6e3ac4579aefe972ac3b16a8d69e83329a073"
+    },
+    {
+      "source_path": "readCaohy/test/diffusion_seed_learning/export_collection_dataset.py",
+      "target_path": "tools/dataset/diffusion_seed_learning/export_collection_dataset.py",
+      "role": "dataset_tools",
+      "copy_mode": "directory",
+      "size_bytes": 3974,
+      "sha256": "feaaca4eedb2e46d5d9bfa156bd1a76741fa4450faece1546227926a38b3bf3c"
+    },
+    {
+      "source_path": "readCaohy/test/diffusion_seed_learning/export_lifecycle_dataset.py",
+      "target_path": "tools/dataset/diffusion_seed_learning/export_lifecycle_dataset.py",
+      "role": "dataset_tools",
+      "copy_mode": "directory",
+      "size_bytes": 19508,
+      "sha256": "b05abf747a7650dc5526872fe0b6b1508cf207315e20fd9bee0857751d3d728d"
+    },
+    {
+      "source_path": "readCaohy/test/diffusion_seed_learning/offline_validator.py",
+      "target_path": "tools/dataset/diffusion_seed_learning/offline_validator.py",
+      "role": "dataset_tools",
+      "copy_mode": "directory",
+      "size_bytes": 18794,
+      "sha256": "352b84fb6538d5263107391897cdf47da08d98e833663cfe4500d90cba9186d5"
+    },
+    {
+      "source_path": "readCaohy/test/diffusion_seed_learning/phase0_lifecycle_inventory.py",
+      "target_path": "tools/dataset/diffusion_seed_learning/phase0_lifecycle_inventory.py",
+      "role": "dataset_tools",
+      "copy_mode": "directory",
+      "size_bytes": 13043,
+      "sha256": "16aa3bff1ae9e08d524e6693921de3ec28d6ed5ed06748f2a60f0bce5cfa645d"
+    },
+    {
+      "source_path": "readCaohy/test/diffusion_seed_learning/real_robot_safety_audit.py",
+      "target_path": "tools/dataset/diffusion_seed_learning/real_robot_safety_audit.py",
+      "role": "dataset_tools",
+      "copy_mode": "directory",
+      "size_bytes": 5365,
+      "sha256": "037d30087edc15b99935a538ca22c4c1e9ad623274ca2c32f9b4266134149761"
+    },
+    {
+      "source_path": "readCaohy/test/diffusion_seed_learning/summarize_lifecycle_dataset.py",
+      "target_path": "tools/dataset/diffusion_seed_learning/summarize_lifecycle_dataset.py",
+      "role": "dataset_tools",
+      "copy_mode": "directory",
+      "size_bytes": 3502,
+      "sha256": "2c15ab6fdce24d7724e8433b793007244b55ebdfe6138059fcde8465fea5de53"
+    },
+    {
+      "source_path": "readCaohy/plans/diffusionSeedLearning/phase10_checkpoint_pointer.json",
+      "target_path": "artifacts/source_phase10_checkpoint_pointer.json",
+      "role": "artifact_pointer_reference",
+      "copy_mode": "file",
+      "size_bytes": 3323,
+      "sha256": "c11fb62a2b2b5b39537b23469da0593abc197d2d4136238e3a27b24598709134"
+    },
+    {
+      "source_path": "readCaohy/plans/diffusionSeedLearning/phase10_training_report.md",
+      "target_path": "docs/source_phase10_training_report.md",
+      "role": "training_reference",
+      "copy_mode": "file",
+      "size_bytes": 3209,
+      "sha256": "5dbf19f7bfa26ecea27c117b74d3f5be0ac218ecb5c53bdbc01d21d6b238420c"
+    }
+  ]
+}

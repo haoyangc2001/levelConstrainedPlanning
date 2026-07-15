@@ -1,0 +1,403 @@
+# [caohy] Phase 13：切换到 CR7 机械臂，与 V1 使用同一台机器人。
+# 删除 V1 trajectory_planning、gripper_driver、realsense_source。
+launch:
+  launch_arguments:
+    real_driver_backend:
+      default: "robot_driver"
+      description: "Use bundled robot_driver with robot_mod selected by robot_profile; use rokae/rokae_cpp only when external rokae_driver is installed."
+    rokae_robot_ip:
+      # [caohy] 2026-06-29 当前 SR5 控制器网络切到 192.168.2.*。
+      default: "192.168.2.160"
+      description: ROKAE robot controller IP for default SR5 profile.
+    rokae_local_ip:
+      # [caohy] 当前设备 enP8p1s0 使用 192.168.2.66/24 连接 SR5 控制器。
+      default: "192.168.2.66"
+      description: Optional local NIC IP for ROKAE SDK on the SR5 network.
+    use_real_robot:
+      default: "false"
+      description: Use real robot feedback and hardware drivers.
+    enable_real_feedback:
+      default: "true"
+      description: Start the selected real robot feedback driver to publish real_joint_states even when execution mode is sim.
+    enable_http:
+      default: "false"
+      description: Start external_comm HTTP entry for task triggering.
+    enable_rviz:
+      default: "false"
+      description: Start RViz visualization for the V2 project.
+    enable_visual_helpers:
+      default: "false"
+      description: Start obstacle and scene mesh visualization helper nodes.
+    enable_vision_stack:
+      default: "false"
+      description: Start vision, camera, and pointcloud helper nodes.
+    enable_diffusion_seed_inference:
+      default: "false"
+      description: Start optional diffusion trajectory seed inference node for shadow/candidate experiments.
+    diffusion_seed_mode:
+      default: "off"
+      description: "Diffusion seed runtime mode: off, shadow, candidate, or fallback."
+    diffusion_seed_k_generate:
+      default: "4"
+      description: Number of diffusion seeds to generate/read before precheck.
+    diffusion_seed_k_accept:
+      default: "2"
+      description: Maximum diffusion seeds allowed to enter CuRobo repair and the candidate pool.
+    diffusion_seed_model_timeout_sec:
+      default: "0.2"
+      description: Timeout budget for diffusion seed generation or file-backed provider lookup.
+    diffusion_seed_max_start_gap_l2:
+      default: "0.05"
+      description: Maximum allowed L2 gap between runtime start joint and diffusion seed first point.
+    diffusion_seed_max_step_l2:
+      default: "1.0"
+      description: Maximum allowed adjacent joint-step L2 before CuRobo repair.
+    diffusion_seed_fallback_to_rule_seed:
+      default: "true"
+      description: Keep rule seed fallback when diffusion generation, precheck, or repair fails.
+    diffusion_seed_allow_real_robot_candidate:
+      default: "false"
+      description: Allow diffusion candidate mode when use_real_robot is true; default blocks real robot candidate.
+    robot_profile:
+      default: "sr5"
+      description: "Robot profile for Level_Test_V2_caohy. Supported values: sr5, cr7. CR7 can still be selected explicitly with robot_profile:=cr7."
+    sr5_task_set:
+      default: "20"
+      description: "SR5 STATE_TEST task set: 20 for default regression, 100 for parity data generation, 100_datagen for fast simulated data generation, 100_independent_datagen for bootstrap-reset data generation."
+  robot:
+    urdf:
+      select_arg: robot_profile
+      cases:
+        cr7: robot/curobo/rokae_cr7_dahuafuhe.urdf
+        sr5: robot/curobo/xms5_r800_w4g3b4c.urdf
+      default: robot/curobo/xms5_r800_w4g3b4c.urdf
+  rviz:
+    display:
+      select_arg: robot_profile
+      cases:
+        cr7: displayV10_realsense_debug.rviz
+        sr5: rviz/xms5_sr5_displayV10_style.rviz
+      default: rviz/xms5_sr5_displayV10_style.rviz
+    fixed_frame:
+      select_arg: robot_profile
+      cases:
+        cr7: Link_00
+        sr5: XMS5-R800-W4G3B4C_base
+      default: XMS5-R800-W4G3B4C_base
+    joint_states_topic:
+      select_arg: robot_profile
+      cases:
+        cr7: joint_states
+        sr5: rviz_joint_states_unused
+      default: rviz_joint_states_unused
+    gripper_configs:
+      - "none:none:0:0"
+  files:
+    # [caohy] Task 8 Phase 8.1-8.4：统一入口按 robot_profile 切换 CR7 / SR5 主流程。
+    main_flow:
+      select_arg: robot_profile
+      cases:
+        cr7: main.yaml
+        sr5:
+          select_arg: sr5_task_set
+          cases:
+            "20": main_sr5_20.yaml
+            "100": main_sr5_100.yaml
+            "100_datagen": main_sr5_100_datagen.yaml
+            "100_independent_datagen": main_sr5_100_independent_datagen.yaml
+          default: main_sr5_20.yaml
+      default: main_sr5_20.yaml
+    state_machine:
+      select_arg: robot_profile
+      cases:
+        cr7: state_machines/state_test/state_machine_v2.yaml
+        sr5:
+          select_arg: sr5_task_set
+          cases:
+            "20": state_machines/state_test/state_machine_v2_sr5_20.yaml
+            "100": state_machines/state_test/state_machine_v2_sr5_100.yaml
+            "100_datagen": state_machines/state_test/state_machine_v2_sr5_100_datagen.yaml
+            "100_independent_datagen": state_machines/state_test/state_machine_v2_sr5_100_independent_datagen.yaml
+          default: state_machines/state_test/state_machine_v2_sr5_20.yaml
+      default: state_machines/state_test/state_machine_v2_sr5_20.yaml
+    vision: vision/realsense_vision_server.yaml
+    obstacle_json: obstacles/abs.autosave.json
+    obstacle_rel_json: obstacles/rel.autosave.json
+    scene_meshes: scene_meshes.yaml
+  obstacle_panel:
+    frame_id:
+      select_arg: robot_profile
+      cases:
+        cr7: Link_00
+        sr5: XMS5-R800-W4G3B4C_base
+      default: XMS5-R800-W4G3B4C_base
+    output_topic: /obstacle_boxes
+    default_size: 0.1
+  scene_mesh_marker:
+    frame_id:
+      select_arg: robot_profile
+      cases:
+        cr7: Link_00
+        sr5: XMS5-R800-W4G3B4C_base
+      default: XMS5-R800-W4G3B4C_base
+    topic: visualization_marker_array
+    publish_period: 1.0
+  nodes:
+    # [caohy] Task 8：SR5 RViz 只使用过滤后的仿真关节状态驱动 TF，避免多个 /joint_states 发布者造成抖动。
+    robot_state_publisher:
+      joint_states_topic:
+        select_arg: robot_profile
+        cases:
+          cr7: joint_states
+          sr5: sim_joint_states
+        default: sim_joint_states
+    # [caohy] Task 8 Phase 2：robot_driver 改为按 robot_profile 切换 CR7 / SR5 命名与机器人实现。
+    robot_driver:
+      robot_mod:
+        select_arg: robot_profile
+        cases:
+          cr7: rokae_sr5
+          sr5: rokae
+        default: rokae
+      robot_ip:
+        launch_arg: rokae_robot_ip
+      local_ip:
+        launch_arg: rokae_local_ip
+      joint_state_pub_name: real_joint_states
+      joint_name:
+        select_arg: robot_profile
+        cases:
+          cr7: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+          sr5:
+            - XMS5-R800-W4G3B4C_joint_1
+            - XMS5-R800-W4G3B4C_joint_2
+            - XMS5-R800-W4G3B4C_joint_3
+            - XMS5-R800-W4G3B4C_joint_4
+            - XMS5-R800-W4G3B4C_joint_5
+            - XMS5-R800-W4G3B4C_joint_6
+        default:
+          - XMS5-R800-W4G3B4C_joint_1
+          - XMS5-R800-W4G3B4C_joint_2
+          - XMS5-R800-W4G3B4C_joint_3
+          - XMS5-R800-W4G3B4C_joint_4
+          - XMS5-R800-W4G3B4C_joint_5
+          - XMS5-R800-W4G3B4C_joint_6
+      frame_id:
+        select_arg: robot_profile
+        cases:
+          cr7: Link_00
+          sr5: XMS5-R800-W4G3B4C_base
+        default: XMS5-R800-W4G3B4C_base
+      # [caohy] Real SR5 strict-level execution: user-confirmed speed for the closed-loop run.
+      speed: 200
+      line_speed: 40
+      default_zone: 0
+      # [caohy] Real SR5 strict-level execution: allow the full closed-loop target_joint_trajectory to finish.
+      move_timeout: 3360.0
+      rt_speed_ratio: 0.05
+      # [caohy] SR5 strict-level execution should follow CuRobo timing through RT FollowPosition,
+      # instead of replaying every trajectory point as a blocking NRT MoveAbsJ waypoint.
+      trajectory_execution_mode:
+        select_arg: robot_profile
+        cases:
+          cr7: nrt_absj
+          sr5: rt_follow
+        default: rt_follow
+      rt_follow_scale: 1.0
+      rt_follow_final_hold_sec: 0.5
+      rt_follow_final_timeout: 5.0
+      rt_follow_start_tolerance_rad: 0.03
+      rt_network_tolerance: 20
+    # [caohy] Task 8 Phase 2：driver_common 改为随 profile 切换 frame / joints / tool。
+    driver_common:
+      robot_model:
+        select_arg: robot_profile
+        cases:
+          cr7: ROKAE CR7
+          sr5: XMS5-R800-W4G3B4C
+        default: XMS5-R800-W4G3B4C
+      frame_id:
+        select_arg: robot_profile
+        cases:
+          cr7: Link_00
+          sr5: XMS5-R800-W4G3B4C_base
+        default: XMS5-R800-W4G3B4C_base
+      joint_name:
+        select_arg: robot_profile
+        cases:
+          cr7: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+          sr5:
+            - XMS5-R800-W4G3B4C_joint_1
+            - XMS5-R800-W4G3B4C_joint_2
+            - XMS5-R800-W4G3B4C_joint_3
+            - XMS5-R800-W4G3B4C_joint_4
+            - XMS5-R800-W4G3B4C_joint_5
+            - XMS5-R800-W4G3B4C_joint_6
+        default:
+          - XMS5-R800-W4G3B4C_joint_1
+          - XMS5-R800-W4G3B4C_joint_2
+          - XMS5-R800-W4G3B4C_joint_3
+          - XMS5-R800-W4G3B4C_joint_4
+          - XMS5-R800-W4G3B4C_joint_5
+          - XMS5-R800-W4G3B4C_joint_6
+      joint_state_pub_name: real_joint_states
+      tool_name:
+        select_arg: robot_profile
+        cases:
+          cr7: dahuafuhe
+          sr5: tool1
+        default: tool1
+      toolset_frame_fallback:
+        select_arg: robot_profile
+        cases:
+          cr7: false
+          sr5: true
+        default: true
+      tool_frame:
+        select_arg: robot_profile
+        cases:
+          cr7: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+          sr5:
+            - -0.01588615307905028
+            - 0.018348498948158043
+            - 0.2586775713451509
+            - 0.03702517838719945
+            - 0.6751675651256659
+            - 2.375248653715161
+        default:
+          - -0.01588615307905028
+          - 0.018348498948158043
+          - 0.2586775713451509
+          - 0.03702517838719945
+          - 0.6751675651256659
+          - 2.375248653715161
+      wobj_name: wobj0
+    # [caohy] Task 8 Phase 2：sim_joint_state_publisher 改为随 profile 切换 joint names 和 retract。
+    # [caohy] 实机 RViz：use_real_robot=true 时用 real_joint_states 驱动 sim_joint_states，
+    # 让 robot_state_publisher / RViz 展示真实机械臂反馈，而不是目标关节或仿真初值。
+    sim_joint_state_publisher:
+      input_topic:
+        select_arg: use_real_robot
+        cases:
+          "true": real_joint_states
+          "false": joint_states
+        default: joint_states
+      output_topic: sim_joint_states
+      publish_to_input_topic:
+        select_arg: use_real_robot
+        cases:
+          "true": false
+          "false":
+            select_arg: robot_profile
+            cases:
+              cr7: true
+              sr5: false
+            default: false
+        default: false
+      publish_initial_state:
+        select_arg: use_real_robot
+        cases:
+          "true": false
+          "false": true
+        default: true
+      publish_rate: 30.0
+      joint_names:
+        select_arg: robot_profile
+        cases:
+          cr7: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+          sr5:
+            - XMS5-R800-W4G3B4C_joint_1
+            - XMS5-R800-W4G3B4C_joint_2
+            - XMS5-R800-W4G3B4C_joint_3
+            - XMS5-R800-W4G3B4C_joint_4
+            - XMS5-R800-W4G3B4C_joint_5
+            - XMS5-R800-W4G3B4C_joint_6
+        default:
+          - XMS5-R800-W4G3B4C_joint_1
+          - XMS5-R800-W4G3B4C_joint_2
+          - XMS5-R800-W4G3B4C_joint_3
+          - XMS5-R800-W4G3B4C_joint_4
+          - XMS5-R800-W4G3B4C_joint_5
+          - XMS5-R800-W4G3B4C_joint_6
+      initial_joint_position:
+        select_arg: robot_profile
+        cases:
+          cr7: [0.0, 0.11, 0.82, 0.0, 0.94, 0.0]
+          sr5: [-1.571, 1.571, 0.0, 1.571, 1.571, 0.0]
+        default: [-1.571, 1.571, 0.0, 1.571, 1.571, 0.0]
+    # [caohy] external_comm 保留，HTTP API 触发任务。
+    external_comm:
+      http_port: 8082
+      entry_state: STATE_TEST
+      default_real_mode:
+        launch_arg: use_real_robot
+    # [caohy] trajectory_planning 删除：V1 规划器不再需要。
+    # [caohy] gripper_driver 删除：STATE_TEST 不使用夹爪。
+    # [caohy] realsense_source 删除：STATE_TEST 不需要视觉。
+    # [caohy] Phase 4：添加 curobo_v2_planner 节点，CuRobo V2 规划器。
+    curobo_v2_planner:
+      # [caohy] tiger10 使用 colcon 生成脚本自身 shebang，避免硬编码旧设备 venv 路径。
+      robot_config:
+        select_arg: robot_profile
+        cases:
+          cr7: robot/rokae_cr7_dahuafuhe_v2.yml
+          sr5: robot/xms5_r800_w4g3b4c_v2.yml
+        default: robot/xms5_r800_w4g3b4c_v2.yml
+      obstacle_json: obstacles/abs.autosave.json
+      obstacle_rel_json: obstacles/rel.autosave.json
+      # [caohy] RViz 障碍物面板当前会保存多个 cuboid；缓存必须大于实际障碍物数量。
+      collision_cache_obb: 16
+      use_cuda_graph: false
+      use_real_robot:
+        launch_arg: use_real_robot
+        value_type: bool
+      diffusion_seed_mode:
+        launch_arg: diffusion_seed_mode
+        value_type: string
+      diffusion_seed_generated_samples_path: /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_mature_diffusion_20260715_generated_samples.json
+      diffusion_seed_checkpoint_path: /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt
+      diffusion_seed_k_generate:
+        launch_arg: diffusion_seed_k_generate
+        value_type: int
+      diffusion_seed_k_accept:
+        launch_arg: diffusion_seed_k_accept
+        value_type: int
+      diffusion_seed_model_timeout_sec:
+        launch_arg: diffusion_seed_model_timeout_sec
+        value_type: float
+      diffusion_seed_max_start_gap_l2:
+        launch_arg: diffusion_seed_max_start_gap_l2
+        value_type: float
+      diffusion_seed_max_step_l2:
+        launch_arg: diffusion_seed_max_step_l2
+        value_type: float
+      diffusion_seed_joint_abs_limit: 6.2832
+      diffusion_seed_fallback_to_rule_seed:
+        launch_arg: diffusion_seed_fallback_to_rule_seed
+        value_type: bool
+      diffusion_seed_allow_real_robot_candidate:
+        launch_arg: diffusion_seed_allow_real_robot_candidate
+        value_type: bool
+    # [caohy] diffusionSeedLearning phase 5：独立 diffusion seed inference skeleton。
+    trajectory_seed_inference:
+      mode:
+        launch_arg: diffusion_seed_mode
+        value_type: string
+      checkpoint_path: /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt
+      model_timeout_sec: 0.2
+      k_generate:
+        launch_arg: diffusion_seed_k_generate
+        value_type: int
+      k_accept:
+        launch_arg: diffusion_seed_k_accept
+        value_type: int
+      generated_samples_path: /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_mature_diffusion_20260715_generated_samples.json
+      max_start_gap_l2:
+        launch_arg: diffusion_seed_max_start_gap_l2
+        value_type: float
+      max_step_l2:
+        launch_arg: diffusion_seed_max_step_l2
+        value_type: float
+      fallback_to_rule_seed:
+        launch_arg: diffusion_seed_fallback_to_rule_seed
+        value_type: bool

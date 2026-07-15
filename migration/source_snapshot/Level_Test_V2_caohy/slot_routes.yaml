@@ -1,0 +1,180 @@
+task_routes:
+  UNLOAD:
+    defaults:
+      point_set: default_place_points
+    device_slots:
+      "1":
+        device_slot_pose_key: manual_pose_1
+      "2":
+        device_slot_pose_key: manual_pose_2
+      "3":
+        device_slot_pose_key: manual_pose_3
+      "4":
+        device_slot_pose_key: manual_pose_4
+      "5":
+        device_slot_pose_key: manual_pose_5
+      "6":
+        device_slot_pose_key: manual_pose_6
+      "7":
+        device_slot_pose_key: manual_pose_7
+      "8":
+        device_slot_pose_key: manual_pose_8
+      "9":
+        device_slot_pose_key: manual_pose_9
+      "10":
+        device_slot_pose_key: manual_pose_10
+    agv_slots:
+      "1":
+        agv_slot_pose_key: put_pose_1
+      "2":
+        agv_slot_pose_key: put_pose_2
+      "3":
+        agv_slot_pose_key: put_pose_3
+      "4":
+        agv_slot_pose_key: put_pose_4
+      "5":
+        agv_slot_pose_key: put_pose_5
+      "6":
+        agv_slot_pose_key: put_pose_6
+      "7":
+        agv_slot_pose_key: put_pose_7
+      "8":
+        agv_slot_pose_key: put_pose_8
+      "9":
+        agv_slot_pose_key: put_pose_9
+      "10":
+        agv_slot_pose_key: put_pose_10
+      "11":
+        agv_slot_pose_key: put_pose_11
+      "12":
+        agv_slot_pose_key: put_pose_12
+      "13":
+        agv_slot_pose_key: put_pose_13
+      "14":
+        agv_slot_pose_key: put_pose_14
+      "15":
+        agv_slot_pose_key: put_pose_15
+      "16":
+        agv_slot_pose_key: put_pose_16
+      "17":
+        agv_slot_pose_key: put_pose_17
+      "18":
+        agv_slot_pose_key: put_pose_18
+      "19":
+        agv_slot_pose_key: put_pose_19
+      "20":
+        agv_slot_pose_key: put_pose_20
+      "21":
+        agv_slot_pose_key: put_pose_21
+      "22":
+        agv_slot_pose_key: put_pose_22
+      "23":
+        agv_slot_pose_key: put_pose_23
+      "24":
+        agv_slot_pose_key: put_pose_24
+      "25":
+        agv_slot_pose_key: put_pose_25
+      "26":
+        agv_slot_pose_key: put_pose_26
+      "27":
+        agv_slot_pose_key: put_pose_27
+      "28":
+        agv_slot_pose_key: put_pose_28
+      "29":
+        agv_slot_pose_key: put_pose_29
+      "30":
+        agv_slot_pose_key: put_pose_30
+      "31":
+        agv_slot_pose_key: put_pose_31
+      "32":
+        agv_slot_pose_key: put_pose_32
+
+  UPLOAD:
+    defaults:
+      point_set: default_place_points
+    device_slots:
+      "1":
+        device_slot_pose_key: manual_pose_1
+      "2":
+        device_slot_pose_key: manual_pose_2
+      "3":
+        device_slot_pose_key: manual_pose_3
+      "4":
+        device_slot_pose_key: manual_pose_4
+      "5":
+        device_slot_pose_key: manual_pose_5
+      "6":
+        device_slot_pose_key: manual_pose_6
+      "7":
+        device_slot_pose_key: manual_pose_7
+      "8":
+        device_slot_pose_key: manual_pose_8
+      "9":
+        device_slot_pose_key: manual_pose_9
+      "10":
+        device_slot_pose_key: manual_pose_10
+    agv_slots:
+      "1":
+        agv_slot_pose_key: put_pose_1
+      "2":
+        agv_slot_pose_key: put_pose_2
+      "3":
+        agv_slot_pose_key: put_pose_3
+      "4":
+        agv_slot_pose_key: put_pose_4
+      "5":
+        agv_slot_pose_key: put_pose_5
+      "6":
+        agv_slot_pose_key: put_pose_6
+      "7":
+        agv_slot_pose_key: put_pose_7
+      "8":
+        agv_slot_pose_key: put_pose_8
+      "9":
+        agv_slot_pose_key: put_pose_9
+      "10":
+        agv_slot_pose_key: put_pose_10
+      "11":
+        agv_slot_pose_key: put_pose_11
+      "12":
+        agv_slot_pose_key: put_pose_12
+      "13":
+        agv_slot_pose_key: put_pose_13
+      "14":
+        agv_slot_pose_key: put_pose_14
+      "15":
+        agv_slot_pose_key: put_pose_15
+      "16":
+        agv_slot_pose_key: put_pose_16
+      "17":
+        agv_slot_pose_key: put_pose_17
+      "18":
+        agv_slot_pose_key: put_pose_18
+      "19":
+        agv_slot_pose_key: put_pose_19
+      "20":
+        agv_slot_pose_key: put_pose_20
+      "21":
+        agv_slot_pose_key: put_pose_21
+      "22":
+        agv_slot_pose_key: put_pose_22
+      "23":
+        agv_slot_pose_key: put_pose_23
+      "24":
+        agv_slot_pose_key: put_pose_24
+      "25":
+        agv_slot_pose_key: put_pose_25
+      "26":
+        agv_slot_pose_key: put_pose_26
+      "27":
+        agv_slot_pose_key: put_pose_27
+      "28":
+        agv_slot_pose_key: put_pose_28
+      "29":
+        agv_slot_pose_key: put_pose_29
+      "30":
+        agv_slot_pose_key: put_pose_30
+      "31":
+        agv_slot_pose_key: put_pose_31
+      "32":
+        agv_slot_pose_key: put_pose_32

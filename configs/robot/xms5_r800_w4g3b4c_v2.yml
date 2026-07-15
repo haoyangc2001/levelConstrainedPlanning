@@ -1,0 +1,80 @@
+# [caohy] Task 8 Phase 1：为 Level_Test_V2_caohy 新增 SR5 的 CuRobo V2 robot config。
+# 基于 sr5_guangmokuai_400g/robot/xms5_r800_w4g3b4c.yml 转换为 V2 格式，
+# 保持 tool1 为严格水平约束评估与执行使用的 TCP。
+robot_cfg:
+  kinematics:
+    format_version: 2.0
+    base_link: XMS5-R800-W4G3B4C_base
+    tool_frames:
+    - tool1
+    urdf_path: curobo/xms5_r800_w4g3b4c.urdf
+    asset_root_path: curobo
+    collision_link_names:
+    - XMS5-R800-W4G3B4C_link1
+    - XMS5-R800-W4G3B4C_link2
+    - XMS5-R800-W4G3B4C_link3
+    - XMS5-R800-W4G3B4C_link4
+    - XMS5-R800-W4G3B4C_link5
+    - XMS5-R800-W4G3B4C_link6
+    collision_spheres: spheres/xms5_r800_w4g3b4c_spherized.yml
+    collision_sphere_buffer: 0.0
+    self_collision_ignore:
+      XMS5-R800-W4G3B4C_link1:
+      - XMS5-R800-W4G3B4C_link2
+      XMS5-R800-W4G3B4C_link2:
+      - XMS5-R800-W4G3B4C_link3
+      XMS5-R800-W4G3B4C_link3:
+      - XMS5-R800-W4G3B4C_link4
+      XMS5-R800-W4G3B4C_link4:
+      - XMS5-R800-W4G3B4C_link5
+      XMS5-R800-W4G3B4C_link5:
+      - XMS5-R800-W4G3B4C_link6
+    self_collision_buffer:
+      XMS5-R800-W4G3B4C_link1: 0
+      XMS5-R800-W4G3B4C_link2: 0
+      XMS5-R800-W4G3B4C_link3: 0
+      XMS5-R800-W4G3B4C_link4: 0
+      XMS5-R800-W4G3B4C_link5: 0
+      XMS5-R800-W4G3B4C_link6: 0
+    use_global_cumul: true
+    mesh_link_names:
+    - XMS5-R800-W4G3B4C_link1
+    - XMS5-R800-W4G3B4C_link2
+    - XMS5-R800-W4G3B4C_link3
+    - XMS5-R800-W4G3B4C_link4
+    - XMS5-R800-W4G3B4C_link5
+    - XMS5-R800-W4G3B4C_link6
+    lock_joints: null
+    extra_links: null
+    cspace:
+      joint_names:
+      - XMS5-R800-W4G3B4C_joint_1
+      - XMS5-R800-W4G3B4C_joint_2
+      - XMS5-R800-W4G3B4C_joint_3
+      - XMS5-R800-W4G3B4C_joint_4
+      - XMS5-R800-W4G3B4C_joint_5
+      - XMS5-R800-W4G3B4C_joint_6
+      default_joint_position:
+      - -1.571
+      - 1.571
+      - 0.0
+      - 1.571
+      - 1.571
+      - 0.0
+      cspace_distance_weight:
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      null_space_weight:
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      max_jerk: 500.0
+      max_acceleration: 12.0
+      position_limit_clip: 0.1

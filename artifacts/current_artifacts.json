@@ -1,0 +1,112 @@
+{
+  "schema_version": "standalone_level_planning.artifacts.v1",
+  "status": "active_pointer_only",
+  "created_at": "2026-07-15",
+  "source_repo_root": "/home/caohy/repositories/tashan_Manipulation",
+  "source_pointer": {
+    "repo_path": "readCaohy/plans/diffusionSeedLearning/phase10_checkpoint_pointer.json",
+    "sha256": "c11fb62a2b2b5b39537b23469da0593abc197d2d4136238e3a27b24598709134"
+  },
+  "dataset": {
+    "name": "sr5_phase10_20260715_baseline_jitter_train",
+    "sample_count": 993,
+    "candidate_count": 833,
+    "validated_candidate_count": 833,
+    "positive_for_diffusion": 140,
+    "positive_for_critic": 140,
+    "training_dataset": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/datasets/sr5_phase10_20260715_baseline_jitter_train/samples_validated.jsonl",
+      "exists": true,
+      "size_bytes": 382655246,
+      "sha256": null
+    },
+    "dataset_manifest": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/datasets/sr5_phase10_20260715_baseline_jitter_train/manifest.json",
+      "exists": true,
+      "size_bytes": 44418,
+      "sha256": "f6d71bd4687d26ef2c226219df5d4a78c07136fa07ac911cab4ffca786359162"
+    },
+    "dataset_summary": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_20260715_baseline_jitter_train_dataset_summary.json",
+      "exists": true,
+      "size_bytes": 1148,
+      "sha256": "7af28893b1e82e0de323365131cb2463a28c77942c4c6aaf8feaaa456cba9614"
+    },
+    "validator_report": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_20260715_baseline_jitter_train_validator_report.json",
+      "exists": true,
+      "size_bytes": 2340,
+      "sha256": "815c21b2e3ce54557947b648936bdfc0360476d1f21843cecdf90461069a7dbb"
+    }
+  },
+  "diffusion": {
+    "run_name": "sr5_phase10_mature_diffusion_20260715",
+    "checkpoint_dir": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715",
+    "best_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt",
+    "last_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/last.pt",
+    "metadata": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/metadata.json",
+    "epochs": 240,
+    "batch_size": 64,
+    "hidden_dim": 128,
+    "diffusion_steps": 64,
+    "horizon": 32,
+    "sample_count": 140,
+    "best_loss": 0.09602215141057968,
+    "best_checkpoint_file": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt",
+      "exists": true,
+      "size_bytes": 1151577,
+      "sha256": null
+    },
+    "metadata_file": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/metadata.json",
+      "exists": true,
+      "size_bytes": 16392,
+      "sha256": "3ada86e93d3a9a24332d5a89a1c39ea4fe082ed28ac0c4061576febdb1870e73"
+    }
+  },
+  "critic": {
+    "run_name": "sr5_phase10_success_critic_20260715",
+    "checkpoint_dir": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715",
+    "best_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/best.pt",
+    "last_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/last.pt",
+    "metadata": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/metadata.json",
+    "epochs": 160,
+    "batch_size": 64,
+    "hidden_dim": 128,
+    "sample_count": 833,
+    "positive_count": 140,
+    "negative_count": 693,
+    "best_loss": 0.18526157434098423,
+    "best_checkpoint_file": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/best.pt",
+      "exists": true,
+      "size_bytes": 196553,
+      "sha256": null
+    },
+    "metadata_file": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/metadata.json",
+      "exists": true,
+      "size_bytes": 26030,
+      "sha256": "f9b4a1a9821d385981ba5758e8c786661c38b6e197075d4c2e4b660235fbd8d0"
+    }
+  },
+  "generated_samples": {
+    "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_mature_diffusion_20260715_generated_samples.json",
+    "exists": true,
+    "size_bytes": 4015350,
+    "sha256": null
+  },
+  "offline_generation_report": {
+    "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_mature_diffusion_20260715_offline_generation_report.json",
+    "exists": true,
+    "size_bytes": 931,
+    "sha256": "2fc6ad6605ccaf4eb35fe0aca9375c875bb7474c537d98ac0466ef49ed1864fd"
+  },
+  "safety_notes": [
+    "diffusion_seed_mode remains off by default in launch config.",
+    "candidate mode remains blocked for real robot unless diffusion_seed_allow_real_robot_candidate is explicitly true.",
+    "The model is a trajectory seed generator; CuRobo repair and hard validation remain mandatory."
+  ],
+  "large_file_policy": "Do not commit datasets, generated samples, or checkpoint .pt files into this repository."
+}

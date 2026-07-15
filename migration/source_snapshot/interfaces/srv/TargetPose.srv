@@ -1,0 +1,11 @@
+# Request
+float32 speed
+sensor_msgs/JointState joint_state
+geometry_msgs/Pose pose
+---
+# Response
+sensor_msgs/JointState joint_state
+geometry_msgs/Pose pose
+bool success
+string message
+string error_code
