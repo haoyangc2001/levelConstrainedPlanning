@@ -26,6 +26,7 @@ from .result_schema import (
     STATUS_FAILED_PRECHECK,
     STATUS_SUCCESS,
 )
+from .repair import SeedRepairAdapter
 from .robot_assets import resolve_robot_config
 from .rule_seed import RuleLevelSeedProvider, RuleSeedProviderConfig
 from .seed_provider import (
@@ -196,7 +197,13 @@ class LevelConstrainedPlanner:
         try:
             normalized = self._normalize_request(request)
             seed_reports = self._run_seed_providers(normalized)
-            candidates, planner_attempts = self._collect_planner_candidates(normalized)
+            external_candidates, external_attempts = self._collect_external_seed_candidates(
+                normalized,
+                seed_reports,
+            )
+            native_candidates, native_attempts = self._collect_planner_candidates(normalized)
+            candidates = external_candidates + native_candidates
+            planner_attempts = external_attempts + native_attempts
             if not candidates:
                 result = PlannerResult(
                     request_id=request_id,
@@ -344,9 +351,11 @@ class LevelConstrainedPlanner:
         reports.append(rule_report)
 
         diffusion_mode = "off"
-        if mode == "diffusion":
-            diffusion_mode = "shadow"
+        if mode in {"diffusion", "candidate"}:
+            diffusion_mode = "candidate"
         elif mode == "mixed":
+            diffusion_mode = "candidate"
+        elif mode == "shadow":
             diffusion_mode = "shadow"
         provider = (
             FileDiffusionSeedProvider(
@@ -377,12 +386,104 @@ class LevelConstrainedPlanner:
             sum(1 for c in provider_report.get("candidates", []) if c.get("precheck", {}).get("valid"))
         )
         provider_report["runtime_effect"] = (
-            "shadow_report_only_no_pool_insertion_in_phase3"
-            if diffusion_mode != "off"
-            else "disabled"
+            "candidate_mode_external_seed_repair_pool"
+            if diffusion_mode == "candidate"
+            else ("shadow_report_only" if diffusion_mode == "shadow" else "disabled")
         )
         reports.append(provider_report)
         return reports
+
+    def _make_goal_and_current_state(self, request: dict[str, Any]):
+        from curobo.types import GoalToolPose, JointState as CuJointState
+
+        target_pose = request["target_pose"]
+        pos = target_pose[:3]
+        quat = constraints.normalize_quaternion(target_pose[3:7])
+        goal = GoalToolPose(
+            tool_frames=self._tool_frames,
+            position=torch.tensor([[[[[pos[0], pos[1], pos[2]]]]]], device=self.device, dtype=torch.float32),
+            quaternion=torch.tensor([[[[[quat[0], quat[1], quat[2], quat[3]]]]]], device=self.device, dtype=torch.float32),
+        )
+        current_state = CuJointState.from_position(
+            torch.tensor([request["start_joint"]], device=self.device, dtype=torch.float32),
+            joint_names=self._joint_names,
+        )
+        return goal, current_state
+
+    def _collect_external_seed_candidates(
+        self,
+        request: dict[str, Any],
+        seed_reports: list[dict[str, Any]],
+    ) -> tuple[list[torch.Tensor], list[dict[str, Any]]]:
+        goal, current_state = self._make_goal_and_current_state(request)
+        adapter = SeedRepairAdapter(
+            motion_planner=self._planner,
+            device=self.device,
+            joint_names=self._joint_names,
+        )
+        candidates: list[torch.Tensor] = []
+        summaries: list[dict[str, Any]] = []
+        for report in seed_reports:
+            provider_name = str(report.get("provider") or report.get("provider_name") or "")
+            provider_mode = str(report.get("mode") or "")
+            if provider_name not in {"rule_seed", "diffusion_seed"}:
+                continue
+            if provider_mode == "shadow":
+                continue
+            for raw_candidate in report.get("candidates", []) or []:
+                precheck = raw_candidate.get("precheck") or {}
+                raw_id = str(raw_candidate.get("candidate_id") or "external_seed")
+                source_type = self._repaired_source_type(raw_candidate.get("source_type"), provider_name)
+                summary: dict[str, Any] = {
+                    "candidate_id": f"{raw_id}_repaired",
+                    "source_type": source_type,
+                    "source_label": str(raw_candidate.get("source_label") or raw_id),
+                    "provider": provider_name,
+                    "provider_mode": provider_mode,
+                    "status": "pending",
+                    "entered_pool": False,
+                    "parent_candidate_id": raw_id,
+                    "metadata": {
+                        "parent_candidate_id": raw_id,
+                        "raw_source_type": raw_candidate.get("source_type"),
+                        "raw_source_label": raw_candidate.get("source_label"),
+                        "provider": provider_name,
+                        "provider_mode": provider_mode,
+                        "raw_metadata": raw_candidate.get("metadata") or {},
+                    },
+                    "precheck": dict(precheck),
+                    "metrics": {},
+                }
+                seed_points = (raw_candidate.get("trajectory") or {}).get("points") or []
+                if not precheck.get("valid"):
+                    summary["status"] = "failed_precheck"
+                    summary["failure_reason"] = precheck.get("failure_reason") or "external_seed_precheck_failed"
+                    summaries.append(summary)
+                    continue
+                if not seed_points:
+                    summary["status"] = "failed_precheck"
+                    summary["failure_reason"] = "external_seed_missing_trajectory_points"
+                    summaries.append(summary)
+                    continue
+                summary["entered_pool"] = True
+                repair = adapter.repair_pose_seed(
+                    seed_points=seed_points,
+                    goal_tool_pose=goal,
+                    current_state=current_state,
+                    return_seeds=1,
+                )
+                summary["optimizer_result"] = dict(repair.optimizer_result)
+                summary["solve_time_sec"] = repair.optimizer_result.get("solve_time_sec")
+                summary["result_status"] = repair.status
+                if repair.success and repair.trajectory is not None:
+                    candidates.append(repair.trajectory)
+                    summary["status"] = "success"
+                    summary["trajectory_shape"] = list(repair.trajectory.shape)
+                else:
+                    summary["status"] = "failed_planner"
+                    summary["failure_reason"] = repair.failure_reason or repair.status
+                summaries.append(summary)
+        return candidates, summaries
 
     def _fk_pose_for_joint(self, joint_position: list[float]) -> list[float]:
         from curobo.types import JointState as CuJointState
@@ -441,20 +542,7 @@ class LevelConstrainedPlanner:
         return [solutions[index].detach().cpu().to(dtype=torch.float32) for index in range(int(solutions.shape[0]))]
 
     def _collect_planner_candidates(self, request: dict[str, Any]) -> tuple[list[torch.Tensor], list[dict[str, Any]]]:
-        from curobo.types import GoalToolPose, JointState as CuJointState
-
-        target_pose = request["target_pose"]
-        pos = target_pose[:3]
-        quat = constraints.normalize_quaternion(target_pose[3:7])
-        goal = GoalToolPose(
-            tool_frames=self._tool_frames,
-            position=torch.tensor([[[[[pos[0], pos[1], pos[2]]]]]], device=self.device, dtype=torch.float32),
-            quaternion=torch.tensor([[[[[quat[0], quat[1], quat[2], quat[3]]]]]], device=self.device, dtype=torch.float32),
-        )
-        current_state = CuJointState.from_position(
-            torch.tensor([request["start_joint"]], device=self.device, dtype=torch.float32),
-            joint_names=self._joint_names,
-        )
+        goal, current_state = self._make_goal_and_current_state(request)
 
         count = max(1, int(self.config.num_candidates))
         count = max(count, int(request.get("metadata", {}).get("num_candidates", 0) or 0))
@@ -492,6 +580,15 @@ class LevelConstrainedPlanner:
                 summary["failure_reason"] = f"{type(exc).__name__}: {exc}"
             summaries.append(summary)
         return candidates, summaries
+
+    @staticmethod
+    def _repaired_source_type(source_type: Any, provider_name: str) -> str:
+        raw = str(source_type or "")
+        if provider_name == "rule_seed" or raw.startswith("rule"):
+            return "rule_seed"
+        if provider_name == "diffusion_seed" or raw.startswith("diffusion"):
+            return "diffusion_seed"
+        return raw or "external_seed"
 
     def _select_candidate(
         self,
@@ -781,6 +878,7 @@ class LevelConstrainedPlanner:
         source_type = self._normalize_source_type(summary.get("source_type") or summary.get("source_label"))
         source_label = str(summary.get("source_label") or source_type)
         status = str(summary.get("status") or "unknown")
+        metadata = dict(summary.get("metadata") or {})
         metrics = dict(summary.get("metrics") or {})
         selected = bool(metrics.get("selected") or summary.get("selected"))
         optimizer_success = status == "success"
@@ -832,8 +930,13 @@ class LevelConstrainedPlanner:
             source_lineage={
                 "source_type": source_type,
                 "source_label": source_label,
-                "provider": "planner_native" if source_type == "planner_native" else source_type,
-                "provider_mode": "native",
+                "provider": summary.get("provider") or ("planner_native" if source_type == "planner_native" else source_type),
+                "provider_mode": summary.get("provider_mode") or "native",
+                "parent_candidate_id": summary.get("parent_candidate_id") or metadata.get("parent_candidate_id"),
+                "raw_source_type": metadata.get("raw_source_type"),
+                "raw_source_label": metadata.get("raw_source_label"),
+                "rule_family_name": (metadata.get("raw_metadata") or {}).get("seed_family_name"),
+                "rule_family_config": (metadata.get("raw_metadata") or {}).get("seed_family_config"),
             },
             trajectory={
                 "format": "joint_position_rad",
@@ -853,6 +956,7 @@ class LevelConstrainedPlanner:
             },
             precheck=dict(summary.get("precheck") or {}),
             optimizer_result={
+                **dict(summary.get("optimizer_result") or {}),
                 "status": status,
                 "success": optimizer_success,
                 "result_status": summary.get("result_status"),
@@ -900,7 +1004,7 @@ class LevelConstrainedPlanner:
                 )
                 failure_reason = (
                     candidate.get("precheck", {}).get("failure_reason")
-                    or "not_repaired_in_phase3"
+                    or "raw_seed_parent_only"
                 )
                 record = CandidateRecord(
                     candidate_id=candidate_id,
@@ -935,14 +1039,14 @@ class LevelConstrainedPlanner:
                     },
                     precheck=dict(candidate.get("precheck") or {}),
                     optimizer_result={
-                        "status": "not_repaired_in_phase3",
+                        "status": "raw_seed_parent_only",
                         "success": False,
-                        "failure_reason": "not_repaired_in_phase3",
+                        "failure_reason": "raw_seed_parent_only",
                     },
                     validator_metrics=validator_metrics,
                     labels={
                         "planner_status": result.status,
-                        "candidate_status": "not_repaired_in_phase3",
+                        "candidate_status": "raw_seed_parent_only",
                         "failure_reason": failure_reason,
                         "selected": False,
                         "validator_valid": False,

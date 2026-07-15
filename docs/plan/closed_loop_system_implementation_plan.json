@@ -508,15 +508,15 @@
       "id": 4,
       "name": "外部 seed pool 与 cuRobo repair 接通",
       "priority": "P0",
-      "status": "not_started",
-      "completed": false,
+      "status": "completed",
+      "completed": true,
       "objective": "让 rule seed、diffusion seed 与 cuRobo native seed 进入统一候选池，并实际经过 cuRobo repair，而不是只做 shadow 记录。",
       "tasks": [
         {
           "id": "4.1",
           "description": "实现 SeedRepairAdapter。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "G0",
             "2.4",
@@ -531,8 +531,8 @@
         {
           "id": "4.2",
           "description": "重构 _collect_planner_candidates 为统一候选池。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "4.1"
           ],
@@ -545,8 +545,8 @@
         {
           "id": "4.3",
           "description": "保留 shadow/candidate 双模式。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "4.2"
           ],
@@ -559,8 +559,8 @@
         {
           "id": "4.4",
           "description": "扩展 headless smoke 验证 candidate 模式。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "4.3"
           ],
@@ -580,6 +580,26 @@
         "file-backed diffusion seed 至少能以 candidate 模式进入 repair pool。",
         "rule seed 至少能以 candidate 模式进入 repair pool。",
         "candidate artifacts 能区分 raw seed、repaired candidate 和 selected final trajectory。"
+      ],
+      "actual_outputs": [
+        "level_planner_core/repair.py 新增 SeedRepairAdapter，封装 trajopt_solver.solve_pose(seed_traj=...)。",
+        "level_planner_core/planner.py 新增外部 seed repair pool，并将 repaired candidates 与 planner_native 合并进入统一 selector。",
+        "diffusion seed mode 支持 candidate 与 shadow；shadow raw seed 不进入 repair pool。",
+        "tests/test_repair.py 覆盖 seed_traj resample 与 [1,1,H,DOF] 打包契约。",
+        "docs/reports/seed_repair_phase4_smoke_report.md",
+        "runs/phase4_seed_repair_smoke/candidate_samples.jsonl",
+        "runs/phase4_diffusion_file_repair_smoke/candidate_samples.jsonl",
+        "runs/phase4_shadow_smoke/summary.json",
+        "runs/phase4_mixed_candidate_smoke/candidate_samples.jsonl"
+      ],
+      "verification": [
+        "python3 -m compileall level_planner_core level_planner tools tests",
+        "PYTHONPATH=$PWD PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q tests/test_candidate_dataset.py tests/test_import_smoke.py tests/test_constraints_smoke.py tests/test_validators.py tests/test_rule_seed.py tests/test_repair.py",
+        "rule candidate smoke 中 rule_seed_00_repaired 进入 repair pool，并保留 parent_candidate_id=rule_seed_00。",
+        "diffusion file candidate smoke 中 diffusion_seed_00_repaired 进入 repair pool，并保留 parent_candidate_id=diffusion_seed_00。",
+        "shadow smoke 中 diffusion raw candidate 存在但 diffusion_repaired_count=0。",
+        "mixed smoke 中 candidate pool 同时包含 rule_seed、diffusion_seed、planner_native、rule_raw_seed。",
+        "TrajectorySeedDataset 与 SuccessCriticDataset 可读取 phase4_mixed_candidate_smoke 数据。"
       ]
     },
     {
