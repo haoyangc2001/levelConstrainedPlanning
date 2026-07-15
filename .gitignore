@@ -4,6 +4,8 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 build/
+install/
+log/
 dist/
 *.egg-info/
 runs/
@@ -12,4 +14,3 @@ logs/
 *.pth
 samples.jsonl
 level_plan_lifecycle/
-

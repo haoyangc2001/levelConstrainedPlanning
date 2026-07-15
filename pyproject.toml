@@ -2,24 +2,5 @@
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[project]
-name = "sr5-level-constrained-planning"
-version = "0.1.0"
-description = "Lightweight SR5 level-constrained CuRobo planning toolkit"
-requires-python = ">=3.10"
-dependencies = [
-  "pyyaml",
-  "torch",
-]
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = [
-  "level_planner*",
-  "level_planner_core*",
-  "level_planner_cli*",
-  "level_planner_ros*",
-]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
