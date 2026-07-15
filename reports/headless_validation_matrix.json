@@ -1,0 +1,322 @@
+{
+  "schema_version": "standalone_level_planning.headless_validation_matrix.v1",
+  "overall": "success",
+  "static": {
+    "compileall": {
+      "cmd": [
+        "/pub/data/caohy/miniconda/envs/CuroboV2/bin/python",
+        "-m",
+        "compileall",
+        "level_planner_core",
+        "level_planner",
+        "level_planner_cli",
+        "level_planner_ros",
+        "tools",
+        "tests",
+        "launch"
+      ],
+      "returncode": 0,
+      "elapsed_sec": 0.255653,
+      "stdout_tail": [
+        "Listing 'level_planner_core'...",
+        "Listing 'level_planner'...",
+        "Listing 'level_planner_cli'...",
+        "Listing 'level_planner_ros'...",
+        "Listing 'tools'...",
+        "Listing 'tools/dataset'...",
+        "Listing 'tools/dataset/diffusion_seed_learning'...",
+        "Listing 'tools/learning'...",
+        "Listing 'tools/learning/diffusion_seed_learning'...",
+        "Listing 'tests'...",
+        "Listing 'launch'..."
+      ]
+    },
+    "artifact_json": {
+      "cmd": [
+        "/pub/data/caohy/miniconda/envs/CuroboV2/bin/python",
+        "-m",
+        "json.tool",
+        "artifacts/current_artifacts.json"
+      ],
+      "returncode": 0,
+      "elapsed_sec": 0.104614,
+      "stdout_tail": [
+        "        \"path\": \"/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_mature_diffusion_20260715_offline_generation_report.json\",",
+        "        \"exists\": true,",
+        "        \"size_bytes\": 931,",
+        "        \"sha256\": \"2fc6ad6605ccaf4eb35fe0aca9375c875bb7474c537d98ac0466ef49ed1864fd\"",
+        "    },",
+        "    \"safety_notes\": [",
+        "        \"diffusion_seed_mode remains off by default in launch config.\",",
+        "        \"candidate mode remains blocked for real robot unless diffusion_seed_allow_real_robot_candidate is explicitly true.\",",
+        "        \"The model is a trajectory seed generator; CuRobo repair and hard validation remain mandatory.\"",
+        "    ],",
+        "    \"large_file_policy\": \"Do not commit datasets, generated samples, or checkpoint .pt files into this repository.\"",
+        "}"
+      ]
+    },
+    "asset_check": {
+      "cmd": [
+        "/pub/data/caohy/miniconda/envs/CuroboV2/bin/python",
+        "tools/check_assets.py",
+        "--config",
+        "configs/sr5_level.yaml"
+      ],
+      "returncode": 0,
+      "elapsed_sec": 0.254811,
+      "stdout_tail": [
+        "      \"ok\": true,",
+        "      \"required\": true,",
+        "      \"detail\": \"configs/asset_manifest.json\"",
+        "    },",
+        "    {",
+        "      \"name\": \"asset_manifest_json\",",
+        "      \"ok\": true,",
+        "      \"required\": true,",
+        "      \"detail\": \"configs/asset_manifest.json\"",
+        "    }",
+        "  ]",
+        "}"
+      ]
+    },
+    "artifact_check": {
+      "cmd": [
+        "/pub/data/caohy/miniconda/envs/CuroboV2/bin/python",
+        "tools/check_artifacts.py",
+        "--strict"
+      ],
+      "returncode": 0,
+      "elapsed_sec": 0.128953,
+      "stdout_tail": [
+        "      \"size_bytes\": 4015350",
+        "    },",
+        "    {",
+        "      \"name\": \"offline_generation_report\",",
+        "      \"path\": \"/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_mature_diffusion_20260715_offline_generation_report.json\",",
+        "      \"exists\": true,",
+        "      \"required\": false,",
+        "      \"size_bytes\": 931",
+        "    }",
+        "  ],",
+        "  \"sync_hint\": \"If required files are missing, sync the phase10 dataset/checkpoints/reports to /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning and rerun this check.\"",
+        "}"
+      ]
+    },
+    "config_yaml": true,
+    "core_forbidden_import_scan": {
+      "returncode": 1,
+      "matches": [],
+      "ok": true
+    }
+  },
+  "cli_single": {
+    "status": "success",
+    "trajectory_points": 121,
+    "alignment": {
+      "tolerance_deg": 15.0,
+      "selected_max_alignment_deviation_deg": 4.4865,
+      "alignment_valid_count": 1,
+      "candidate_max_alignment_deviation": [
+        26.8239,
+        4.4865,
+        98.8564,
+        136.8503
+      ]
+    },
+    "artifacts": {
+      "result_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/cli_single/result.json",
+      "selected_trajectory_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/cli_single/selected_trajectory.json",
+      "candidate_summary_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/cli_single/candidate_summary.json",
+      "lifecycle_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/cli_single/lifecycle.json"
+    }
+  },
+  "batch": {
+    "request_count": 5,
+    "status_counts": {
+      "success": 2,
+      "failed_alignment_constraint": 2,
+      "failed_planner": 1
+    },
+    "rows": [
+      {
+        "name": "success",
+        "request_id": "request_level_001",
+        "status": "success",
+        "failure_reason": null,
+        "trajectory_points": 121,
+        "result_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/batch/success/result.json",
+        "seed_reports": [
+          {
+            "provider": "rule_seed",
+            "mode": "fallback_available",
+            "status": "not_generated_in_phase3_minimal_core",
+            "generated_count": 0,
+            "runtime_effect": "planner_native_seed_path_is_used_first"
+          },
+          {
+            "provider": "diffusion_seed",
+            "mode": "off",
+            "status": "disabled",
+            "generated_count": 0,
+            "runtime_effect": "disabled"
+          }
+        ]
+      },
+      {
+        "name": "alignment_hard",
+        "request_id": "request_level_alignment_hard",
+        "status": "failed_alignment_constraint",
+        "failure_reason": "No trajectory meets strict alignment_tolerance=3.0 deg. Best candidate has max_deviation=4.4872 deg.",
+        "trajectory_points": 0,
+        "result_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/batch/alignment_hard/result.json",
+        "seed_reports": [
+          {
+            "provider": "rule_seed",
+            "mode": "fallback_available",
+            "status": "not_generated_in_phase3_minimal_core",
+            "generated_count": 0,
+            "runtime_effect": "planner_native_seed_path_is_used_first"
+          },
+          {
+            "provider": "diffusion_seed",
+            "mode": "off",
+            "status": "disabled",
+            "generated_count": 0,
+            "runtime_effect": "disabled"
+          }
+        ]
+      },
+      {
+        "name": "planner_fail",
+        "request_id": "request_level_planner_fail",
+        "status": "failed_planner",
+        "failure_reason": "curobo_plan_pose_returned_no_successful_candidate",
+        "trajectory_points": 0,
+        "result_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/batch/planner_fail/result.json",
+        "seed_reports": [
+          {
+            "provider": "rule_seed",
+            "mode": "fallback_available",
+            "status": "not_generated_in_phase3_minimal_core",
+            "generated_count": 0,
+            "runtime_effect": "planner_native_seed_path_is_used_first"
+          },
+          {
+            "provider": "diffusion_seed",
+            "mode": "off",
+            "status": "disabled",
+            "generated_count": 0,
+            "runtime_effect": "disabled"
+          }
+        ]
+      },
+      {
+        "name": "diffusion_shadow",
+        "request_id": "request_level_001_diffusion_shadow",
+        "status": "success",
+        "failure_reason": null,
+        "trajectory_points": 121,
+        "result_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/batch/diffusion_shadow/result.json",
+        "seed_reports": [
+          {
+            "provider": "rule_seed",
+            "mode": "fallback_available",
+            "status": "not_generated_in_phase3_minimal_core",
+            "generated_count": 0,
+            "runtime_effect": "planner_native_seed_path_is_used_first"
+          },
+          {
+            "provider": "diffusion_seed",
+            "mode": "shadow",
+            "status": "generated",
+            "generated_count": 2,
+            "runtime_effect": "shadow_report_only_no_pool_insertion_in_phase3"
+          }
+        ]
+      },
+      {
+        "name": "mixed_shadow",
+        "request_id": "request_level_001_mixed_shadow",
+        "status": "failed_alignment_constraint",
+        "failure_reason": "No trajectory meets strict alignment_tolerance=15.0 deg. Best candidate has max_deviation=26.8732 deg.",
+        "trajectory_points": 0,
+        "result_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/batch/mixed_shadow/result.json",
+        "seed_reports": [
+          {
+            "provider": "rule_seed",
+            "mode": "fallback_available",
+            "status": "not_generated_in_phase3_minimal_core",
+            "generated_count": 0,
+            "runtime_effect": "planner_native_seed_path_is_used_first"
+          },
+          {
+            "provider": "diffusion_seed",
+            "mode": "shadow",
+            "status": "generated",
+            "generated_count": 2,
+            "runtime_effect": "shadow_report_only_no_pool_insertion_in_phase3"
+          }
+        ]
+      }
+    ]
+  },
+  "diffusion_smoke": {
+    "schema_version": "offline_generation_report.v1",
+    "generated": "runs/headless_matrix/diffusion/generated_samples_smoke.json",
+    "precheck_definition": {
+      "joint_step_max_l2": 1.5,
+      "joint_abs_limit": 6.283185307179586,
+      "start_gap_l2": 1e-05,
+      "note": "Standalone phase 6 seed precheck; CuRobo repair and hard FK/collision validation remain mandatory."
+    },
+    "diffusion_seed": {
+      "count": 2,
+      "valid_count": 2,
+      "valid_ratio": 1.0,
+      "max_joint_step_l2": 0.3596627116203308,
+      "max_start_gap_l2": 0.0
+    },
+    "rule_positive_replay": {
+      "count": 1,
+      "valid_count": 1,
+      "valid_ratio": 1.0,
+      "max_joint_step_l2": 0.19639736413955688,
+      "max_start_gap_l2": 0.0
+    },
+    "random_seed": {
+      "count": 2,
+      "valid_count": 0,
+      "valid_ratio": 0.0,
+      "max_joint_step_l2": 5.003362655639648,
+      "max_start_gap_l2": 0.0
+    }
+  },
+  "ros_adapter": {
+    "build": {
+      "cmd": [
+        "colcon",
+        "build",
+        "--symlink-install",
+        "--packages-select",
+        "level_planner_ros"
+      ],
+      "returncode": 0,
+      "elapsed_sec": 7.230328,
+      "stdout_tail": [
+        "Starting >>> level_planner_ros",
+        "/pub/data/caohy/miniconda/envs/CuroboV2/lib/python3.10/site-packages/wheel/bdist_wheel.py:4: FutureWarning: The 'wheel' package is no longer the canonical location of the 'bdist_wheel' command, and will be removed in a future release. Please update to setuptools v70.1 or later which contains an integrated version of this command.",
+        "  warn(",
+        "toml section missing PosixPath('pyproject.toml') does not contain a tool.setuptools_scm section",
+        "Finished <<< level_planner_ros [6.40s]",
+        "",
+        "Summary: 1 package finished [6.76s]"
+      ]
+    },
+    "run_check": {
+      "returncode": 0,
+      "stdout_tail": [
+        "level_planner_ros check ok"
+      ]
+    }
+  }
+}
