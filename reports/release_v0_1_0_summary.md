@@ -25,7 +25,7 @@ Excluded:
 
 - source repo: `/home/caohy/repositories/tashan_Manipulation`
 - source repo commit: `b1db865a7f679cce578f66013e53f063f22dac30`
-- standalone repo: `/home/caohy/repositories/sr5_level_constrained_planning`
+- standalone repo: `/home/caohy/repositories/levelConstrainedPlanning`
 - artifact pointer schema: `standalone_level_planning.artifacts.v1`
 - source pointer sha256: `c11fb62a2b2b5b39537b23469da0593abc197d2d4136238e3a27b24598709134`
 

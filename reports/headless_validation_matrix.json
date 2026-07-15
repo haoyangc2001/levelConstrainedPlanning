@@ -16,7 +16,7 @@
         "launch"
       ],
       "returncode": 0,
-      "elapsed_sec": 0.467059,
+      "elapsed_sec": 0.427614,
       "stdout_tail": [
         "Compiling 'tools/learning/diffusion_seed_learning/diffusion.py'...",
         "Compiling 'tools/learning/diffusion_seed_learning/evaluate.py'...",
@@ -40,7 +40,7 @@
         "artifacts/current_artifacts.json"
       ],
       "returncode": 0,
-      "elapsed_sec": 0.089092,
+      "elapsed_sec": 0.140308,
       "stdout_tail": [
         "        \"path\": \"/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_mature_diffusion_20260715_offline_generation_report.json\",",
         "        \"exists\": true,",
@@ -64,7 +64,7 @@
         "configs/sr5_level.yaml"
       ],
       "returncode": 0,
-      "elapsed_sec": 0.239135,
+      "elapsed_sec": 0.180888,
       "stdout_tail": [
         "      \"ok\": true,",
         "      \"required\": true,",
@@ -87,7 +87,7 @@
         "--strict"
       ],
       "returncode": 0,
-      "elapsed_sec": 0.070796,
+      "elapsed_sec": 0.144869,
       "stdout_tail": [
         "      \"size_bytes\": 4015350",
         "    },",
@@ -125,10 +125,10 @@
       ]
     },
     "artifacts": {
-      "result_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/cli_single/result.json",
-      "selected_trajectory_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/cli_single/selected_trajectory.json",
-      "candidate_summary_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/cli_single/candidate_summary.json",
-      "lifecycle_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/cli_single/lifecycle.json"
+      "result_json": "/home/caohy/repositories/levelConstrainedPlanning/runs/headless_matrix/cli_single/result.json",
+      "selected_trajectory_json": "/home/caohy/repositories/levelConstrainedPlanning/runs/headless_matrix/cli_single/selected_trajectory.json",
+      "candidate_summary_json": "/home/caohy/repositories/levelConstrainedPlanning/runs/headless_matrix/cli_single/candidate_summary.json",
+      "lifecycle_json": "/home/caohy/repositories/levelConstrainedPlanning/runs/headless_matrix/cli_single/lifecycle.json"
     }
   },
   "batch": {
@@ -145,7 +145,7 @@
         "status": "success",
         "failure_reason": null,
         "trajectory_points": 121,
-        "result_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/batch/success/result.json",
+        "result_json": "/home/caohy/repositories/levelConstrainedPlanning/runs/headless_matrix/batch/success/result.json",
         "seed_reports": [
           {
             "provider": "rule_seed",
@@ -169,7 +169,7 @@
         "status": "failed_alignment_constraint",
         "failure_reason": "No trajectory meets strict alignment_tolerance=3.0 deg. Best candidate has max_deviation=4.4872 deg.",
         "trajectory_points": 0,
-        "result_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/batch/alignment_hard/result.json",
+        "result_json": "/home/caohy/repositories/levelConstrainedPlanning/runs/headless_matrix/batch/alignment_hard/result.json",
         "seed_reports": [
           {
             "provider": "rule_seed",
@@ -193,7 +193,7 @@
         "status": "failed_planner",
         "failure_reason": "curobo_plan_pose_returned_no_successful_candidate",
         "trajectory_points": 0,
-        "result_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/batch/planner_fail/result.json",
+        "result_json": "/home/caohy/repositories/levelConstrainedPlanning/runs/headless_matrix/batch/planner_fail/result.json",
         "seed_reports": [
           {
             "provider": "rule_seed",
@@ -217,7 +217,7 @@
         "status": "success",
         "failure_reason": null,
         "trajectory_points": 121,
-        "result_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/batch/diffusion_shadow/result.json",
+        "result_json": "/home/caohy/repositories/levelConstrainedPlanning/runs/headless_matrix/batch/diffusion_shadow/result.json",
         "seed_reports": [
           {
             "provider": "rule_seed",
@@ -241,7 +241,7 @@
         "status": "failed_alignment_constraint",
         "failure_reason": "No trajectory meets strict alignment_tolerance=15.0 deg. Best candidate has max_deviation=26.8732 deg.",
         "trajectory_points": 0,
-        "result_json": "/home/caohy/repositories/sr5_level_constrained_planning/runs/headless_matrix/batch/mixed_shadow/result.json",
+        "result_json": "/home/caohy/repositories/levelConstrainedPlanning/runs/headless_matrix/batch/mixed_shadow/result.json",
         "seed_reports": [
           {
             "provider": "rule_seed",
@@ -274,7 +274,7 @@
       "count": 2,
       "valid_count": 2,
       "valid_ratio": 1.0,
-      "max_joint_step_l2": 0.27731484174728394,
+      "max_joint_step_l2": 0.29116156697273254,
       "max_start_gap_l2": 0.0
     },
     "rule_positive_replay": {
@@ -288,7 +288,7 @@
       "count": 2,
       "valid_count": 0,
       "valid_ratio": 0.0,
-      "max_joint_step_l2": 5.093034744262695,
+      "max_joint_step_l2": 4.821966171264648,
       "max_start_gap_l2": 0.0
     }
   },
@@ -302,15 +302,15 @@
         "level_planner_ros"
       ],
       "returncode": 0,
-      "elapsed_sec": 7.267811,
+      "elapsed_sec": 12.588128,
       "stdout_tail": [
         "Starting >>> level_planner_ros",
         "/pub/data/caohy/miniconda/envs/CuroboV2/lib/python3.10/site-packages/wheel/bdist_wheel.py:4: FutureWarning: The 'wheel' package is no longer the canonical location of the 'bdist_wheel' command, and will be removed in a future release. Please update to setuptools v70.1 or later which contains an integrated version of this command.",
         "  warn(",
         "toml section missing PosixPath('pyproject.toml') does not contain a tool.setuptools_scm section",
-        "Finished <<< level_planner_ros [6.46s]",
+        "Finished <<< level_planner_ros [11.5s]",
         "",
-        "Summary: 1 package finished [6.80s]"
+        "Summary: 1 package finished [11.9s]"
       ]
     },
     "run_check": {

@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "status": "completed",
   "source_repo_root": "/home/caohy/repositories/tashan_Manipulation",
-  "target_repo_root": "/home/caohy/repositories/sr5_level_constrained_planning",
+  "target_repo_root": "/home/caohy/repositories/levelConstrainedPlanning",
   "manifest_path": "/home/caohy/repositories/tashan_Manipulation/readCaohy/plans/standaloneLevelPlanning/migration/extraction_manifest.json",
   "copied_file_count": 44,
   "copied_size_bytes": 8774483,

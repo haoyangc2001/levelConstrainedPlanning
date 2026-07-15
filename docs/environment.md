@@ -15,7 +15,7 @@ Default validation is headless. RViz is not required for this project.
 ## Activate
 
 ```bash
-cd /home/caohy/repositories/sr5_level_constrained_planning
+cd /home/caohy/repositories/levelConstrainedPlanning
 source /home/caohy/repositories/tashan_Manipulation/scripts/activate_curobo_v2_conda_env.sh
 ```
 
