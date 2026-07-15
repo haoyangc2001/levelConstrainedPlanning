@@ -80,6 +80,8 @@ class LevelPlannerConfig:
         "sr5_phase10_success_critic_20260715/best.pt"
     )
     learned_seed_use_critic: bool = True
+    artifact_pointer: str | None = None
+    load_model_paths_from_artifacts: bool = False
 
     @classmethod
     def from_file(cls, path: str | Path) -> "LevelPlannerConfig":
@@ -127,6 +129,8 @@ class LevelPlannerConfig:
             "diffusion_checkpoint_path",
             "critic_checkpoint_path",
             "learned_seed_use_critic",
+            "artifact_pointer",
+            "load_model_paths_from_artifacts",
         ):
             if key in planner_cfg:
                 setattr(cfg, key, planner_cfg[key])
@@ -135,7 +139,31 @@ class LevelPlannerConfig:
         cfg.obstacle_rel_json = _resolve_path(
             planner_cfg.get("obstacle_rel_json", cfg.obstacle_rel_json)
         )
+        cfg.artifact_pointer = _resolve_path(planner_cfg.get("artifact_pointer", cfg.artifact_pointer))
+        if bool(cfg.load_model_paths_from_artifacts) and cfg.artifact_pointer:
+            cfg._apply_artifact_pointer(Path(cfg.artifact_pointer))
         return cfg
+
+    def _apply_artifact_pointer(self, pointer_path: Path) -> None:
+        if not pointer_path.exists():
+            LOGGER.warning("artifact pointer not found, keeping configured model paths: %s", pointer_path)
+            return
+        try:
+            artifacts = json.loads(pointer_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            LOGGER.warning("failed to read artifact pointer %s: %s", pointer_path, exc)
+            return
+        diffusion = artifacts.get("diffusion") or {}
+        critic = artifacts.get("critic") or {}
+        diffusion_checkpoint = diffusion.get("best_checkpoint") or diffusion.get("best_checkpoint_file", {}).get("path")
+        critic_checkpoint = critic.get("best_checkpoint") or critic.get("best_checkpoint_file", {}).get("path")
+        generated_samples = artifacts.get("generated_samples", {}).get("path")
+        if diffusion_checkpoint:
+            self.diffusion_checkpoint_path = str(diffusion_checkpoint)
+        if critic_checkpoint:
+            self.critic_checkpoint_path = str(critic_checkpoint)
+        if generated_samples:
+            self.diffusion_generated_samples_path = str(generated_samples)
 
 
 class LevelConstrainedPlanner:
@@ -260,8 +288,12 @@ class LevelConstrainedPlanner:
         trace: list[dict[str, Any]] = []
         mode = str(request.get("seed_policy", {}).get("mode") or "rule")
         fallback_to_rule = bool(request.get("seed_policy", {}).get("fallback_to_rule_seed", True))
+        fallback_to_planner_native = bool(
+            request.get("seed_policy", {}).get("fallback_to_planner_native", True)
+        )
         total_budget_ms = float(request.get("metadata", {}).get("total_budget_ms") or 0.0)
         learned_modes = {"diffusion", "mixed", "candidate"}
+        last_result: PlannerResult | None = None
 
         if mode in learned_modes:
             learned_result = self._select_branch_or_fail(
@@ -274,6 +306,7 @@ class LevelConstrainedPlanner:
                 started_at=started_at,
             )
             trace.append(self._branch_trace_record("learned", learned_result, started_at, total_budget_ms))
+            last_result = learned_result
             if learned_result.status == STATUS_SUCCESS:
                 learned_result.candidates = all_summaries
                 learned_result.metrics["success_source"] = "learned"
@@ -291,6 +324,7 @@ class LevelConstrainedPlanner:
                     started_at=started_at,
                 )
                 trace.append(self._branch_trace_record("rule_fallback", rule_result, started_at, total_budget_ms))
+                last_result = rule_result
                 if rule_result.status == STATUS_SUCCESS:
                     rule_result.candidates = all_summaries
                     rule_result.metrics["success_source"] = "rule_fallback"
@@ -308,11 +342,23 @@ class LevelConstrainedPlanner:
                 started_at=started_at,
             )
             trace.append(self._branch_trace_record("rule", rule_result, started_at, total_budget_ms))
+            last_result = rule_result
             if rule_result.status == STATUS_SUCCESS:
                 rule_result.candidates = all_summaries
                 rule_result.metrics["success_source"] = "rule"
                 rule_result.metrics["control_flow_trace"] = trace
                 return rule_result
+
+        if not fallback_to_planner_native:
+            return self._finalize_without_native_fallback(
+                request_id=request_id,
+                seed_reports=seed_reports,
+                all_summaries=all_summaries,
+                trace=trace,
+                last_result=last_result,
+                started_at=started_at,
+                mode=mode,
+            )
 
         native_candidates, native_summaries = self._collect_planner_candidates(request)
         all_summaries.extend(native_summaries)
@@ -333,6 +379,38 @@ class LevelConstrainedPlanner:
             native_result.failure_reason = native_result.failure_reason or "failed_all_fallbacks"
             native_result.status = "failed_all_fallbacks"
         return native_result
+
+    def _finalize_without_native_fallback(
+        self,
+        *,
+        request_id: str,
+        seed_reports: list[dict[str, Any]],
+        all_summaries: list[dict[str, Any]],
+        trace: list[dict[str, Any]],
+        last_result: PlannerResult | None,
+        started_at: float,
+        mode: str,
+    ) -> PlannerResult:
+        if last_result is None:
+            last_result = PlannerResult(
+                request_id=request_id,
+                status=STATUS_FAILED_PLANNER,
+                failure_reason="planner_native_fallback_disabled_and_no_branch_candidates",
+                metrics=self._base_metrics(started_at),
+                seed_provider_reports=seed_reports,
+                candidates=all_summaries,
+            )
+        last_result.candidates = all_summaries
+        last_result.metrics["success_source"] = None
+        last_result.metrics["control_flow_trace"] = trace
+        last_result.metrics["planner_native_fallback_disabled"] = True
+        if last_result.status != STATUS_SUCCESS and mode in {"diffusion", "mixed", "candidate"}:
+            last_result.status = "failed_all_fallbacks"
+            last_result.failure_reason = (
+                last_result.failure_reason
+                or "learned_and_rule_branches_failed_with_planner_native_disabled"
+            )
+        return last_result
 
     def _select_branch_or_fail(
         self,
@@ -450,6 +528,7 @@ class LevelConstrainedPlanner:
                 "k_generate": int(seed_policy.get("k_generate", 0)),
                 "k_accept": int(seed_policy.get("k_accept", 0)),
                 "fallback_to_rule_seed": bool(seed_policy.get("fallback_to_rule_seed", True)),
+                "fallback_to_planner_native": bool(seed_policy.get("fallback_to_planner_native", True)),
                 "timeout_sec": float(seed_policy.get("timeout_sec", 0.2)),
                 "diffusion_artifact_pointer": seed_policy.get("diffusion_artifact_pointer"),
             },

@@ -23,6 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--md-out", type=Path, default=DEFAULT_MD_OUT)
     parser.add_argument("--joint-step-max-l2", type=float, default=1.5)
     parser.add_argument("--joint-abs-limit", type=float, default=2 * math.pi)
+    parser.add_argument("--random-seed", type=int, default=20260715)
     return parser.parse_args()
 
 
@@ -61,6 +62,7 @@ def summarize_checks(checks: list[dict]) -> dict:
 
 def main() -> None:
     args = parse_args()
+    generator = torch.Generator().manual_seed(int(args.random_seed))
     generated = json.loads(args.generated.read_text(encoding="utf-8"))
     diffusion_checks = []
     rule_replay_checks = []
@@ -72,7 +74,11 @@ def main() -> None:
         for traj_points in result["generated"]:
             traj = torch.tensor(traj_points, dtype=torch.float32)
             diffusion_checks.append(precheck(traj, q_start, args))
-            random_traj = torch.randn_like(traj) * 0.5
+            random_traj = torch.randn(
+                traj.shape,
+                dtype=traj.dtype,
+                generator=generator,
+            ) * 0.5
             random_traj[0] = q_start
             random_checks.append(precheck(random_traj, q_start, args))
     report = {
@@ -82,7 +88,7 @@ def main() -> None:
             "joint_step_max_l2": args.joint_step_max_l2,
             "joint_abs_limit": args.joint_abs_limit,
             "start_gap_l2": 1e-5,
-            "note": "Standalone phase 6 seed precheck; CuRobo repair and hard FK/collision validation remain mandatory.",
+            "note": "Standalone diffusion seed precheck; CuRobo repair and hard FK/collision validation remain mandatory.",
         },
         "diffusion_seed": summarize_checks(diffusion_checks),
         "rule_positive_replay": summarize_checks(rule_replay_checks),
@@ -93,15 +99,15 @@ def main() -> None:
     args.md_out.parent.mkdir(parents=True, exist_ok=True)
     args.md_out.write_text(
         "\n".join([
-            "<!-- standaloneLevelPlanning phase 6 diffusion seed smoke report -->",
-            "# Diffusion Seed Smoke Report",
+            "<!-- standaloneLevelPlanning diffusion seed precheck report -->",
+            "# Diffusion Seed Precheck Report",
             "",
             f"- generated: `{args.generated}`",
             f"- diffusion valid ratio: `{report['diffusion_seed']['valid_ratio']:.3f}`",
             f"- rule positive replay valid ratio: `{report['rule_positive_replay']['valid_ratio']:.3f}`",
             f"- random valid ratio: `{report['random_seed']['valid_ratio']:.3f}`",
             "",
-            "该报告只证明训练/采样/预检工具链可运行，不替代 CuRobo repair 与 hard validation。",
+            "该报告只证明训练/采样/预检工具链可运行，不替代 CuRobo repair 与 hard validation；Phase 8 的真实验收以 closed-loop CuRobo benchmark 为准。",
             "",
         ]),
         encoding="utf-8",

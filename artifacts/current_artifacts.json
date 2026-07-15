@@ -1,6 +1,6 @@
 {
   "schema_version": "standalone_level_planning.artifacts.v1",
-  "status": "active_standalone_closed_loop_dataset",
+  "status": "active_standalone_closed_loop_models",
   "created_at": "2026-07-15",
   "source_repo_root": "/home/caohy/repositories/tashan_Manipulation",
   "source_pointer": {
@@ -68,68 +68,103 @@
     }
   },
   "diffusion": {
-    "run_name": "sr5_phase10_mature_diffusion_20260715",
-    "checkpoint_dir": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715",
-    "best_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt",
-    "last_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/last.pt",
-    "metadata": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/metadata.json",
-    "epochs": 240,
-    "batch_size": 64,
-    "hidden_dim": 128,
-    "diffusion_steps": 64,
+    "run_name": "sr5_closed_loop_phase8_diffusion_20260715",
+    "checkpoint_dir": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715",
+    "best_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/best.pt",
+    "last_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/last.pt",
+    "metadata": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/metadata.json",
+    "epochs": 80,
+    "batch_size": 4,
+    "hidden_dim": 64,
     "horizon": 32,
-    "sample_count": 140,
-    "best_loss": 0.09602215141057968,
+    "sample_count": 3,
+    "best_loss": 0.34562963247299194,
+    "samples_path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl",
+    "samples_sha256": "ef63ecaa75e50bb1b58fb81bd8ca7d3b727e34059359a071854ede98a5d1dba7",
+    "model_config": {
+      "dof": 6,
+      "condition_dim": 15,
+      "hidden_dim": 64
+    },
+    "hyperparameters": {
+      "epochs": 80,
+      "batch_size": 4,
+      "lr": 0.001,
+      "device": "cuda:0"
+    },
     "best_checkpoint_file": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt",
+      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/best.pt",
       "exists": true,
-      "size_bytes": 1151577,
+      "size_bytes": 300697,
       "sha256": null
     },
     "metadata_file": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/metadata.json",
+      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/metadata.json",
       "exists": true,
-      "size_bytes": 16392,
-      "sha256": "3ada86e93d3a9a24332d5a89a1c39ea4fe082ed28ac0c4061576febdb1870e73"
+      "size_bytes": 6308,
+      "sha256": "89a52fdfc1937958a9fe87a3a7cb0c21eb9fe8d2781bed9cc207f2cc7960e40d"
+    },
+    "diffusion_steps": 32,
+    "diffusion_config": {
+      "steps": 32
     }
   },
   "critic": {
-    "run_name": "sr5_phase10_success_critic_20260715",
-    "checkpoint_dir": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715",
-    "best_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/best.pt",
-    "last_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/last.pt",
-    "metadata": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/metadata.json",
-    "epochs": 160,
-    "batch_size": 64,
+    "run_name": "sr5_closed_loop_phase8_success_critic_20260715",
+    "checkpoint_dir": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715",
+    "best_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/best.pt",
+    "last_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/last.pt",
+    "metadata": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/metadata.json",
+    "epochs": 120,
+    "batch_size": 8,
     "hidden_dim": 128,
-    "sample_count": 833,
-    "positive_count": 140,
-    "negative_count": 693,
-    "best_loss": 0.18526157434098423,
+    "horizon": 32,
+    "sample_count": 31,
+    "best_loss": 0.11679375679523218,
+    "samples_path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl",
+    "samples_sha256": "ef63ecaa75e50bb1b58fb81bd8ca7d3b727e34059359a071854ede98a5d1dba7",
+    "model_config": {
+      "input_dim": 227,
+      "hidden_dim": 128
+    },
+    "hyperparameters": {
+      "epochs": 120,
+      "batch_size": 8,
+      "lr": 0.002,
+      "device": "cuda:0"
+    },
     "best_checkpoint_file": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/best.pt",
+      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/best.pt",
       "exists": true,
-      "size_bytes": 196553,
+      "size_bytes": 196617,
       "sha256": null
     },
     "metadata_file": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/metadata.json",
+      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/metadata.json",
       "exists": true,
-      "size_bytes": 26030,
-      "sha256": "f9b4a1a9821d385981ba5758e8c786661c38b6e197075d4c2e4b660235fbd8d0"
+      "size_bytes": 20490,
+      "sha256": "0f0e80c4780177377fab2b4336c87002c87d6c8d360b794cb32c052a3d008121"
+    },
+    "positive_count": 2,
+    "negative_count": 29,
+    "source_type_counts": {
+      "rule_seed": 2,
+      "rule_raw_seed": 8,
+      "diffusion_seed": 8,
+      "planner_native": 13
     }
   },
   "generated_samples": {
-    "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_mature_diffusion_20260715_generated_samples.json",
+    "path": "/pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_diffusion_generated_samples.json",
     "exists": true,
-    "size_bytes": 4015350,
+    "size_bytes": 56329,
     "sha256": null
   },
   "offline_generation_report": {
-    "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_mature_diffusion_20260715_offline_generation_report.json",
+    "path": "/pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_offline_generation_report.json",
     "exists": true,
-    "size_bytes": 931,
-    "sha256": "2fc6ad6605ccaf4eb35fe0aca9375c875bb7474c537d98ac0466ef49ed1864fd"
+    "size_bytes": 912,
+    "sha256": "4a8f57dab5a2b50b0243b6863c5eabf8a1968d037cefea56a7eca928ae4e9f69"
   },
   "safety_notes": [
     "diffusion_seed_mode remains off by default in launch config.",
@@ -169,10 +204,82 @@
       "sha256": "815c21b2e3ce54557947b648936bdfc0360476d1f21843cecdf90461069a7dbb"
     }
   },
-  "updated_at": "2026-07-15T16:19:26.762160+00:00",
+  "updated_at": "2026-07-15T16:31:02.552276+00:00",
   "closed_loop_dataset_pointer": {
     "path": "artifacts/closed_loop_dataset_pointer.json",
     "git_commit": "88fece28dd88e905c09ec9dcff4f8f6ccde06eec",
     "dataset_name": "sr5_closed_loop_phase7_smoke_20260715"
+  },
+  "legacy_phase10_diffusion": {
+    "run_name": "sr5_phase10_mature_diffusion_20260715",
+    "checkpoint_dir": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715",
+    "best_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt",
+    "last_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/last.pt",
+    "metadata": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/metadata.json",
+    "epochs": 240,
+    "batch_size": 64,
+    "hidden_dim": 128,
+    "diffusion_steps": 64,
+    "horizon": 32,
+    "sample_count": 140,
+    "best_loss": 0.09602215141057968,
+    "best_checkpoint_file": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt",
+      "exists": true,
+      "size_bytes": 1151577,
+      "sha256": null
+    },
+    "metadata_file": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/metadata.json",
+      "exists": true,
+      "size_bytes": 16392,
+      "sha256": "3ada86e93d3a9a24332d5a89a1c39ea4fe082ed28ac0c4061576febdb1870e73"
+    }
+  },
+  "legacy_phase10_critic": {
+    "run_name": "sr5_phase10_success_critic_20260715",
+    "checkpoint_dir": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715",
+    "best_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/best.pt",
+    "last_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/last.pt",
+    "metadata": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/metadata.json",
+    "epochs": 160,
+    "batch_size": 64,
+    "hidden_dim": 128,
+    "sample_count": 833,
+    "positive_count": 140,
+    "negative_count": 693,
+    "best_loss": 0.18526157434098423,
+    "best_checkpoint_file": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/best.pt",
+      "exists": true,
+      "size_bytes": 196553,
+      "sha256": null
+    },
+    "metadata_file": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/metadata.json",
+      "exists": true,
+      "size_bytes": 26030,
+      "sha256": "f9b4a1a9821d385981ba5758e8c786661c38b6e197075d4c2e4b660235fbd8d0"
+    }
+  },
+  "git_commit": "1c86e179c2b1e144cba2e5b113fa30e88e30e4c9",
+  "closed_loop_benchmark": {
+    "report": {
+      "path": "docs/reports/phase8_closed_loop_benchmark_report.md",
+      "exists": true,
+      "size_bytes": 635,
+      "sha256": "0f15eb359a8602e7fc7d368840ee2d2532e7b41ef05e70a8249919ca7c008ff6"
+    },
+    "summary": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_benchmark_summary.json",
+      "exists": true,
+      "size_bytes": 11015,
+      "sha256": "afef9df28d70096bb35ab44ddd32ad0f702fd2bb6d661792336086e0c47ea334"
+    }
+  },
+  "runtime_resolution": {
+    "config": "configs/sr5_level.yaml",
+    "artifact_pointer": "artifacts/current_artifacts.json",
+    "note": "LevelPlannerConfig loads diffusion/critic best_checkpoint from this pointer when load_model_paths_from_artifacts=true."
   }
 }

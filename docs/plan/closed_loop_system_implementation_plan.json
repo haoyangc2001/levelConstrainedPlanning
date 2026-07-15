@@ -897,15 +897,15 @@
       "id": 8,
       "name": "模型训练、评估与 artifact 更新闭环",
       "priority": "P1",
-      "status": "not_started",
-      "completed": false,
+      "status": "completed",
+      "completed": true,
       "objective": "让新数据集能周期性训练 diffusion/critic，并用 cuRobo 验证口径评估模型 seed 是否优于规则 baseline。",
       "tasks": [
         {
           "id": "8.1",
           "description": "升级 diffusion/critic dataset loaders 到新 schema。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "7.4"
           ],
@@ -918,8 +918,8 @@
         {
           "id": "8.2",
           "description": "训练新一版 standalone diffusion 和 critic。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "8.1"
           ],
@@ -932,8 +932,8 @@
         {
           "id": "8.3",
           "description": "建立模型 seed 经 cuRobo repair 的真实评估。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "8.2",
             "6.4"
@@ -947,8 +947,8 @@
         {
           "id": "8.4",
           "description": "更新 artifact pointer 和训练报告。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "8.3"
           ],
@@ -970,6 +970,29 @@
         "模型评估不再只停留在 offline precheck。",
         "至少一份报告比较 rule-only 与 learned+fallback 的最终成功率。",
         "artifact pointer 能驱动 runtime 使用新模型。"
+      ],
+      "actual_outputs": [
+        "level_planner_core/planner.py 增加 artifact pointer 模型路径解析，configs/sr5_level.yaml 默认从 artifacts/current_artifacts.json 加载 diffusion/critic checkpoint。",
+        "level_planner_core/planner.py seed_policy 增加 fallback_to_planner_native，支持 benchmark 区分纯 rule、纯 diffusion 和 mixed fallback。",
+        "tools/learning/diffusion_seed_learning/train.py 和 train_critic.py metadata 增加 samples_sha256、model_config、hyperparameters、best/last checkpoint。",
+        "tools/learning/diffusion_seed_learning/register_model_artifacts.py 更新 artifacts/current_artifacts.json，保留 legacy_phase10_diffusion / legacy_phase10_critic。",
+        "tools/dataset/run_closed_loop_benchmark.py 真实调用 LevelConstrainedPlanner core，比较 rule_only、diffusion_only、diffusion_critic、mixed_fallback。",
+        "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/best.pt",
+        "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/best.pt",
+        "/pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_benchmark_summary.json",
+        "docs/reports/phase8_closed_loop_benchmark_report.md",
+        "docs/reports/phase8_training_and_benchmark_report.md",
+        "tests/test_phase8_artifact_and_benchmark.py"
+      ],
+      "verification": [
+        "python3 -m compileall level_planner_core level_planner tools tests",
+        "PYTHONPATH=$PWD PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q tests/test_phase8_artifact_and_benchmark.py tests/test_phase7_dataset_pipeline.py tests/test_candidate_dataset.py tests/test_learned_seed.py",
+        "PYTHONPATH=$PWD python tools/learning/diffusion_seed_learning/train.py --samples /pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl --out-dir /pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715 --horizon 32 --epochs 80 --batch-size 4 --hidden-dim 64 --diffusion-steps 32 --lr 0.001 --device cuda:0",
+        "PYTHONPATH=$PWD python tools/learning/diffusion_seed_learning/train_critic.py --samples /pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl --out-dir /pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715 --horizon 32 --epochs 120 --batch-size 8 --hidden-dim 128 --lr 0.002 --device cuda:0",
+        "PYTHONPATH=$PWD python tools/learning/diffusion_seed_learning/sample.py --checkpoint /pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/best.pt --samples /pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl --out /pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_diffusion_generated_samples.json --tasks 2 --k 3 --max-step-l2 1.0 --device cuda:0",
+        "PYTHONPATH=$PWD python tools/dataset/run_closed_loop_benchmark.py --requests runs/phase7_offline_pipeline_smoke/requests.jsonl --config configs/sr5_level.yaml --out-dir runs/phase8_closed_loop_benchmark --json-out /pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_benchmark_summary.json --md-out docs/reports/phase8_closed_loop_benchmark_report.md --limit 3 --device cuda:0 --no-use-cuda-graph --warmup-iterations 0 --num-candidates 2 --total-budget-ms 2500 --progress",
+        "Phase 8 benchmark: rule_only final_success=1/3, diffusion_only=0/3, diffusion_critic=0/3, mixed_fallback=1/3，mixed_fallback fallback_recovery=1/3。",
+        "LevelPlannerConfig.from_file('configs/sr5_level.yaml') 在 CuroboV2 环境中解析到 /pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_* checkpoint。"
       ]
     },
     {

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections import Counter
 from datetime import datetime, timezone
@@ -19,6 +20,14 @@ from artifact_paths import public_root
 
 
 DEFAULT_CRITIC_DIR = public_root() / "checkpoints/standalone_sr5_success_critic"
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,7 +48,11 @@ def main() -> None:
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     dataset = SuccessCriticDataset(args.samples, horizon=args.horizon)
     loader = DataLoader(dataset, batch_size=min(args.batch_size, len(dataset)), shuffle=True)
-    model = SuccessCriticMLP(dataset.input_dim, hidden_dim=args.hidden_dim).to(device)
+    model_config = {
+        "input_dim": dataset.input_dim,
+        "hidden_dim": args.hidden_dim,
+    }
+    model = SuccessCriticMLP(**model_config).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     positives = int(torch.sum(dataset.success).item())
     negatives = int(len(dataset) - positives)
@@ -85,12 +98,10 @@ def main() -> None:
         checkpoint = {
             "schema_version": "success_critic_checkpoint.v1",
             "model_state_dict": model.state_dict(),
-            "model_config": {
-                "input_dim": dataset.input_dim,
-                "hidden_dim": args.hidden_dim,
-            },
+            "model_config": model_config,
             "normalization": dataset.normalization.to_json(),
             "samples_path": str(args.samples),
+            "samples_sha256": sha256_file(args.samples),
             "horizon": args.horizon,
             "label_schema": {
                 "success": "labels.positive_for_critic",
@@ -113,12 +124,24 @@ def main() -> None:
         "created_at": datetime.now(timezone.utc).isoformat(),
         "run_name": args.out_dir.name,
         "samples_path": str(args.samples),
+        "samples_sha256": sha256_file(args.samples),
         "sample_count": len(dataset),
         "positive_count": positives,
         "negative_count": negatives,
         "source_type_counts": dict(source_counts),
+        "model_config": model_config,
+        "hyperparameters": {
+            "epochs": args.epochs,
+            "batch_size": args.batch_size,
+            "lr": args.lr,
+            "device": str(device),
+        },
+        "best_checkpoint": str(args.out_dir / "best.pt"),
+        "last_checkpoint": str(args.out_dir / "last.pt"),
         "horizon": args.horizon,
         "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "hidden_dim": args.hidden_dim,
         "best_loss": best_loss,
         "history": history,
         "label_schema": checkpoint["label_schema"],

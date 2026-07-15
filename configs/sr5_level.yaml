@@ -19,6 +19,8 @@ planner:
   rule_seed_include_smooth_bridge_variants: true
   rule_seed_smoothing_passes: 2
   rule_seed_bridge_radius: 2
+  artifact_pointer: ../artifacts/current_artifacts.json
+  load_model_paths_from_artifacts: true
   diffusion_generated_samples_path: /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_mature_diffusion_20260715_generated_samples.json
   diffusion_checkpoint_path: /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt
   critic_checkpoint_path: /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/best.pt
