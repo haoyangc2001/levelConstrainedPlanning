@@ -999,15 +999,15 @@
       "id": 9,
       "name": "闭环系统验收与发布冻结",
       "priority": "P1",
-      "status": "not_started",
-      "completed": false,
+      "status": "completed",
+      "completed": true,
       "objective": "冻结第一版真正闭环系统基线，确保仓库可复现、数据可追踪、模型可回滚、在线失败可回退。",
       "tasks": [
         {
           "id": "9.1",
           "description": "扩展 headless smoke 为 closed-loop smoke。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "8.4"
           ],
@@ -1020,8 +1020,8 @@
         {
           "id": "9.2",
           "description": "建立 release checklist。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "9.1"
           ],
@@ -1035,8 +1035,8 @@
         {
           "id": "9.3",
           "description": "打闭环系统基线 tag。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "9.2"
           ],
@@ -1057,6 +1057,21 @@
         "learned 失败能回退 rule seed 并记录数据。",
         "在线运行结果能导出为下一轮训练数据。",
         "固定预算 benchmark 有 rule-only 与 learned+fallback 对照。"
+      ],
+      "actual_outputs": [
+        "scripts/closed_loop_smoke.py：覆盖 rule_only、diffusion_shadow、diffusion_candidate、mixed_fallback，并导出/验证 candidate dataset。",
+        "tools/release/check_closed_loop_release.py：检查大文件/checkpoint 不进 git、artifact pointer 存在、project_mainline 文档一致、CLI/Python API/ROS adapter 均走 core。",
+        "docs/reports/phase9_closed_loop_smoke_report.md",
+        "reports/release_v0_2_0_closed_loop_checklist.json",
+        "reports/release_v0_2_0_closed_loop_summary.md",
+        "v0.2.0-closed-loop-baseline tag"
+      ],
+      "verification": [
+        "PYTHONPATH=$PWD python scripts/closed_loop_smoke.py --config configs/sr5_level.yaml --request examples/requests/request_level_alignment_hard.json --out-dir runs/phase9_closed_loop_smoke --summary-out runs/phase9_closed_loop_smoke/summary.json --device cuda:0 --num-candidates 2 --warmup-iterations 0",
+        "closed_loop_smoke checks: dataset_exported=true, dataset_schema_valid=true, model_sample=true, critic_score=true, fallback_trace=true, no_rviz_required=true。",
+        "PYTHONPATH=$PWD python3 tools/release/check_closed_loop_release.py --pointer artifacts/current_artifacts.json --json-out reports/release_v0_2_0_closed_loop_checklist.json --md-out reports/release_v0_2_0_closed_loop_summary.md --tag v0.2.0-closed-loop-baseline",
+        "release checklist passed: artifact pointer strict check true, no large/checkpoint files tracked, docs aligned, CLI/API/ROS adapter use LevelConstrainedPlanner core。",
+        "git tag v0.2.0-closed-loop-baseline"
       ]
     }
   ],

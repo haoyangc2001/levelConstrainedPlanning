@@ -126,5 +126,20 @@ artifacts/current_artifacts.json
 The actual files remain under:
 
 ```text
-/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning
+/pub/data/caohy/levelConstrainedPlanning
 ```
+
+Legacy phase10 artifacts from `tashan_Manipulation` are still recorded in `artifacts/current_artifacts.json` as rollback baselines. The active standalone dataset and Phase 8 checkpoints are under `/pub/data/caohy/levelConstrainedPlanning`.
+
+## Closed-Loop Smoke
+
+Run the first closed-loop baseline smoke without RViz:
+
+```bash
+source /home/caohy/repositories/tashan_Manipulation/scripts/activate_curobo_v2_conda_env.sh
+PYTHONPATH=$PWD python scripts/closed_loop_smoke.py \
+  --config configs/sr5_level.yaml \
+  --device cuda:0
+```
+
+The smoke covers `rule_only`, `diffusion_shadow`, `diffusion_candidate`, and `mixed_fallback`, then exports and validates candidate-level dataset rows.

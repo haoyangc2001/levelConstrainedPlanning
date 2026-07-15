@@ -73,12 +73,16 @@ The feedback path is mandatory. A successful online trajectory, a failed learned
 
 ## Current Baseline
 
-The current repository already contains the first loop baseline:
+The current repository now contains the first closed-loop baseline through Phase 8:
 
 - rule seed and diffusion seed provider interfaces in the planner core;
 - CLI/headless smoke paths for repeatable generation and validation;
-- artifact pointers for the phase10 diffusion and critic checkpoints;
-- dataset/export and evaluation tools under `tools/`;
+- task sampling and lifecycle batch tools under `tools/dataset/`;
+- candidate-level export, schema validation, dataset manifest, and artifact pointer registration;
+- standalone Phase 7 dataset under `/pub/data/caohy/levelConstrainedPlanning/datasets`;
+- standalone Phase 8 diffusion and critic checkpoints under `/pub/data/caohy/levelConstrainedPlanning/checkpoints`;
+- a CuRobo benchmark comparing rule-only, diffusion-only, diffusion+critic, and mixed fallback;
+- artifact pointers for current standalone models plus legacy phase10 rollback pointers;
 - design documents under `docs/design/` that define the trajectory-optimization and diffusion-seed principles.
 
-The next project work should close the loop more tightly: make online run artifacts directly exportable into the dataset schema, keep failure/fallback evidence complete, and evaluate learned seeds by final CuRobo-validated success rate rather than by model loss alone.
+The current learned model is a small smoke baseline, not a quality claim. In the Phase 8 CuRobo benchmark, learned-only branches did not outperform rule-only; mixed fallback remained reliable because failed learned seeds returned to rule/native fallback and all outcomes were recorded. The next model-quality step is to generate a larger dataset with the Phase 7 batch pipeline and retrain through the same Phase 8 artifact path.

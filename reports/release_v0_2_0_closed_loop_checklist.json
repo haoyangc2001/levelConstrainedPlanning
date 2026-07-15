@@ -1,0 +1,250 @@
+{
+  "schema_version": "closed_loop_release_checklist.v1",
+  "created_at": "2026-07-15T16:38:06.880089+00:00",
+  "pointer": "artifacts/current_artifacts.json",
+  "artifact_check": {
+    "schema_version": "standalone_level_planning.artifact_check.v1",
+    "ok": true,
+    "strict": true,
+    "pointer": "artifacts/current_artifacts.json",
+    "public_data_root": "/pub/data/caohy/levelConstrainedPlanning",
+    "missing_required": [],
+    "checks": [
+      {
+        "name": "training_dataset",
+        "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl",
+        "exists": true,
+        "required": true,
+        "size_bytes": 358989
+      },
+      {
+        "name": "dataset_manifest",
+        "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/manifest.json",
+        "exists": true,
+        "required": true,
+        "size_bytes": 2328
+      },
+      {
+        "name": "dataset_summary",
+        "path": null,
+        "exists": false,
+        "required": false,
+        "size_bytes": null
+      },
+      {
+        "name": "validator_report",
+        "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/validator_report.json",
+        "exists": true,
+        "required": false,
+        "size_bytes": 611
+      },
+      {
+        "name": "diffusion_best_checkpoint",
+        "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/best.pt",
+        "exists": true,
+        "required": true,
+        "size_bytes": 300697
+      },
+      {
+        "name": "diffusion_metadata",
+        "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/metadata.json",
+        "exists": true,
+        "required": false,
+        "size_bytes": 6308
+      },
+      {
+        "name": "critic_best_checkpoint",
+        "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/best.pt",
+        "exists": true,
+        "required": true,
+        "size_bytes": 196617
+      },
+      {
+        "name": "critic_metadata",
+        "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/metadata.json",
+        "exists": true,
+        "required": false,
+        "size_bytes": 20490
+      },
+      {
+        "name": "generated_samples",
+        "path": "/pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_diffusion_generated_samples.json",
+        "exists": true,
+        "required": false,
+        "size_bytes": 56329
+      },
+      {
+        "name": "offline_generation_report",
+        "path": "/pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_offline_generation_report.json",
+        "exists": true,
+        "required": false,
+        "size_bytes": 912
+      }
+    ],
+    "sync_hint": "If required files are missing, sync the dataset/checkpoint files recorded in artifacts/current_artifacts.json and rerun this check."
+  },
+  "large_or_forbidden_tracked_files": [],
+  "docs_checks": {
+    "project_mainline_mentions_closed_loop": true,
+    "project_mainline_mentions_phase8_baseline": true
+  },
+  "entry_checks": {
+    "python_api_exports_core": true,
+    "cli_uses_core": true,
+    "ros_adapter_uses_core": true
+  },
+  "benchmark_summary": {
+    "path": "/pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_benchmark_summary.json",
+    "exists": true,
+    "size_bytes": 11015,
+    "sha256": "afef9df28d70096bb35ab44ddd32ad0f702fd2bb6d661792336086e0c47ea334"
+  },
+  "dataset": {
+    "name": "sr5_closed_loop_phase7_smoke_20260715",
+    "sample_count": 44,
+    "candidate_count": 44,
+    "request_count": 6,
+    "positive_for_diffusion": 3,
+    "positive_for_critic": 2,
+    "negative_for_critic": 42,
+    "source_type_counts": {
+      "diffusion_seed": 12,
+      "planner_native": 16,
+      "rule_raw_seed": 8,
+      "rule_seed": 8
+    },
+    "candidate_status_counts": {
+      "failed_planner": 13,
+      "raw_seed_parent_only": 16,
+      "success": 15
+    },
+    "difficulty_bucket_counts": {
+      "easy": 18,
+      "hard": 12,
+      "medium": 14
+    },
+    "obstacle_case_counts": {
+      "multi": 2,
+      "none": 2,
+      "single": 2
+    },
+    "training_dataset": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl",
+      "exists": true,
+      "size_bytes": 358989,
+      "sha256": "ef63ecaa75e50bb1b58fb81bd8ca7d3b727e34059359a071854ede98a5d1dba7"
+    },
+    "dataset_manifest": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/manifest.json",
+      "exists": true,
+      "size_bytes": 2328,
+      "sha256": "be816f0d26b92554582094a6157a6bccbd34a4a7dde28c6bc16a05e7a4b09632"
+    },
+    "validator_report": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/validator_report.json",
+      "exists": true,
+      "size_bytes": 611,
+      "sha256": "6145be49d643425e5fc6508d340eae38fb7aa741e0a68fc4d8ea8fc188488eed"
+    },
+    "batch_summary": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/batch_summary.json",
+      "exists": true,
+      "size_bytes": 5815,
+      "sha256": "c314bf093bbb649236827fa3220d4d2ec77887f1ab93aa44dbb44366f1278ac0"
+    },
+    "sampling_manifest": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/sampling_manifest.json",
+      "exists": true,
+      "size_bytes": 1405,
+      "sha256": "324eeafea3d080333d4ffb6ce741d72d4c6109925cd9a29bcfa47029290994d6"
+    }
+  },
+  "diffusion": {
+    "run_name": "sr5_closed_loop_phase8_diffusion_20260715",
+    "checkpoint_dir": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715",
+    "best_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/best.pt",
+    "last_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/last.pt",
+    "metadata": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/metadata.json",
+    "epochs": 80,
+    "batch_size": 4,
+    "hidden_dim": 64,
+    "horizon": 32,
+    "sample_count": 3,
+    "best_loss": 0.34562963247299194,
+    "samples_path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl",
+    "samples_sha256": "ef63ecaa75e50bb1b58fb81bd8ca7d3b727e34059359a071854ede98a5d1dba7",
+    "model_config": {
+      "dof": 6,
+      "condition_dim": 15,
+      "hidden_dim": 64
+    },
+    "hyperparameters": {
+      "epochs": 80,
+      "batch_size": 4,
+      "lr": 0.001,
+      "device": "cuda:0"
+    },
+    "best_checkpoint_file": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/best.pt",
+      "exists": true,
+      "size_bytes": 300697,
+      "sha256": null
+    },
+    "metadata_file": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/metadata.json",
+      "exists": true,
+      "size_bytes": 6308,
+      "sha256": "89a52fdfc1937958a9fe87a3a7cb0c21eb9fe8d2781bed9cc207f2cc7960e40d"
+    },
+    "diffusion_steps": 32,
+    "diffusion_config": {
+      "steps": 32
+    }
+  },
+  "critic": {
+    "run_name": "sr5_closed_loop_phase8_success_critic_20260715",
+    "checkpoint_dir": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715",
+    "best_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/best.pt",
+    "last_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/last.pt",
+    "metadata": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/metadata.json",
+    "epochs": 120,
+    "batch_size": 8,
+    "hidden_dim": 128,
+    "horizon": 32,
+    "sample_count": 31,
+    "best_loss": 0.11679375679523218,
+    "samples_path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl",
+    "samples_sha256": "ef63ecaa75e50bb1b58fb81bd8ca7d3b727e34059359a071854ede98a5d1dba7",
+    "model_config": {
+      "input_dim": 227,
+      "hidden_dim": 128
+    },
+    "hyperparameters": {
+      "epochs": 120,
+      "batch_size": 8,
+      "lr": 0.002,
+      "device": "cuda:0"
+    },
+    "best_checkpoint_file": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/best.pt",
+      "exists": true,
+      "size_bytes": 196617,
+      "sha256": null
+    },
+    "metadata_file": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/metadata.json",
+      "exists": true,
+      "size_bytes": 20490,
+      "sha256": "0f0e80c4780177377fab2b4336c87002c87d6c8d360b794cb32c052a3d008121"
+    },
+    "positive_count": 2,
+    "negative_count": 29,
+    "source_type_counts": {
+      "rule_seed": 2,
+      "rule_raw_seed": 8,
+      "diffusion_seed": 8,
+      "planner_native": 13
+    }
+  },
+  "passed": true
+}
