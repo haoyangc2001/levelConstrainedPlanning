@@ -1,19 +1,19 @@
 # SR5 Level Constrained Planning
 
-Lightweight planning-first project extracted from:
+Lightweight closed-loop constrained planning and seed-learning project extracted from:
 
 ```text
 /home/caohy/repositories/tashan_Manipulation
 ```
 
-The first version focuses on SR5 level/end-effector pose constrained trajectory planning:
+The first version focuses on SR5 level/end-effector pose constrained trajectory planning as the executable core of a learning-optimization loop:
 
 ```text
-request JSON/YAML
--> LevelConstrainedPlanner.plan(request)
--> planner/rule/diffusion seed providers
+online/offline task JSON/YAML
+-> rule or learned trajectory seed providers
 -> CuRobo V2 repair and hard validation
--> result JSON + trajectory artifacts
+-> success/failure artifacts and metrics
+-> dataset update and next model training cycle
 ```
 
 ## Project Mainline
@@ -27,6 +27,11 @@ data generation -> model learning -> optimization validation -> failure fallback
 In Chinese design terms: `数据生成 - 模型学习 - 优化验收 - 失败回退 - 数据更新`.
 
 The planner is the executable core of that loop. Rule-based seed families and CuRobo validation generate reliable training/evaluation data; diffusion and critic models learn better seed distributions from that data; every learned candidate still returns to CuRobo repair, hard validation, fallback handling, and dataset update.
+
+The intended system has two coupled paths:
+
+- Offline path: sample task scenes, build rule seeds, run CuRobo optimization, collect successful trajectories and failed seeds, then train diffusion/critic models.
+- Online path: accept a live task, try learned trajectory seeds first, run CuRobo repair and constraint validation, fall back to rule seed search on failure, then feed all outcomes back to the dataset.
 
 ## Boundary
 
@@ -85,6 +90,8 @@ from level_planner_core import LevelConstrainedPlanner
 planner = LevelConstrainedPlanner.from_config("configs/sr5_level.yaml")
 result = planner.plan(request)
 ```
+
+This entrypoint is the online-loop validation kernel. Its outputs should be treated as data records as well as planner results: selected trajectory, candidate reports, failure reason, hard-validation metrics, and artifact paths are all useful for the next offline dataset update.
 
 ## Smoke Validation
 

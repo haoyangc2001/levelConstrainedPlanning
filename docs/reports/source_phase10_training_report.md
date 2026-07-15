@@ -1,6 +1,14 @@
 <!-- [caohy] diffusionSeedLearning phase 10 SR5 mature offline model report -->
 # Phase 10 SR5 Mature Offline Model
 
+This report is one offline snapshot of the larger closed-loop system:
+
+```text
+data generation -> model learning -> optimization validation -> failure fallback -> data update
+```
+
+The checkpoints below are seed-generation assets. They are not final trajectory policies; online use must still run CuRobo repair, hard validation, and rule fallback before outputting a trajectory.
+
 ## Dataset
 
 - dataset: `sr5_phase10_20260715_baseline_jitter_train`

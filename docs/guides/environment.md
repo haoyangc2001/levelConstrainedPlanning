@@ -12,6 +12,11 @@ GPU: NVIDIA A100 / CUDA driver capability 12.6
 
 Default validation is headless. RViz is not required for this project.
 
+The same environment is used for both sides of the closed-loop system:
+
+- offline data generation, model sampling/evaluation, and artifact checks;
+- online plan-only validation, learned-seed repair, rule fallback, and result recording.
+
 ## Activate
 
 ```bash
@@ -39,3 +44,5 @@ python tools/check_artifacts.py --strict
 ```
 
 No display server is needed. Do not use RViz as an acceptance condition for this lightweight project.
+
+Acceptance should be based on CuRobo repair, hard validation, structured result files, and dataset/export compatibility.

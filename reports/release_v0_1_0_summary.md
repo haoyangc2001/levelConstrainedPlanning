@@ -2,7 +2,11 @@
 
 ## Scope
 
-This release freezes the first lightweight SR5 level constrained planning project.
+This release freezes the first lightweight SR5 level constrained planning project as the baseline executable core of the closed-loop learning-optimization system:
+
+```text
+data generation -> model learning -> optimization validation -> failure fallback -> data update
+```
 
 Included:
 
@@ -12,6 +16,7 @@ Included:
 - SR5 robot/world assets only.
 - Phase10 diffusion seed artifact pointers and smoke tooling.
 - Headless validation matrix.
+- Documentation for the offline/online feedback loop.
 
 Excluded:
 
@@ -65,4 +70,4 @@ scripts/smoke_test.sh
 - Large data, checkpoints, generated samples, and benchmark bundles stay under `/pub/data/caohy` or an external artifact store.
 - Real robot usage must first pass plan-only, dry-run, and a safety checklist.
 - Diffusion output remains a seed source only; CuRobo repair and hard validation remain mandatory.
-
+- Learned-seed failure, rule-fallback recovery, and unrecovered failures should be recorded as dataset evidence for the next training cycle.

@@ -1,6 +1,16 @@
 # Dataset And Training
 
-Dataset export, offline validation, diffusion training, critic training, sampling, and evaluation tools are migrated under:
+Dataset export, offline validation, diffusion training, critic training, sampling, and evaluation tools implement the offline half of the closed-loop system:
+
+```text
+task-scene sampling
+-> rule seed construction + CuRobo optimization
+-> trajectory dataset
+-> learning model training
+-> online validation feedback
+```
+
+Tools are migrated under:
 
 ```text
 tools/
@@ -19,6 +29,18 @@ data generation -> model learning -> optimization validation -> failure fallback
 ```
 
 Dataset records should therefore preserve successes, failed seeds, fallback outcomes, validation metrics, and optimizer costs. Training only on polished final trajectories is not enough; the system needs evidence about which seeds are repairable, which ones fail, and why.
+
+## Dataset Contract
+
+Each generated or online-feedback record should keep enough information to support both diffusion training and critic training:
+
+- task condition: start joints, target pose, obstacle layout, level constraint, robot profile;
+- seed evidence: seed source, seed family, random seed, learned/rule mode, candidate index;
+- optimization evidence: CuRobo status, optimization time, iteration/cost summary, selected or rejected trajectory;
+- validation evidence: level error, collision distance/risk, joint-limit margin, continuity/jump metrics, goal error;
+- outcome: success, learned-seed failure, rule-fallback success, unrecovered failure, and failure reason.
+
+The diffusion model should learn high-success seed distributions. The critic should learn repairability, constraint risk, and expected optimization cost from both positive and negative candidates.
 
 Check external artifact pointers:
 

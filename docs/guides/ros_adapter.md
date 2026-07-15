@@ -1,6 +1,6 @@
 # Optional ROS Adapter
 
-The ROS adapter is intentionally thin:
+The ROS adapter is an optional online task ingress for the same closed-loop planner core. It is intentionally thin:
 
 ```text
 std_srvs/Trigger plan_default
@@ -11,6 +11,8 @@ std_srvs/Trigger plan_default
 ```
 
 It does not start motion, HTTP, RViz, vision, scanner, gripper, or state machine nodes.
+
+It also does not bypass the loop contract: learned seeds remain candidate seeds, CuRobo repair and hard validation remain mandatory, and result artifacts should still be written so online runs can feed the offline dataset.
 
 Smoke check without planner initialization:
 

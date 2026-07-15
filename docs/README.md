@@ -2,25 +2,25 @@
 
 This directory keeps project documentation grouped by purpose instead of mixing all Markdown files in one flat folder.
 
-The project mainline is the closed-loop evolution system:
+The project mainline is the closed-loop learning-optimization system:
 
 ```text
 data generation -> model learning -> optimization validation -> failure fallback -> data update
 ```
 
-Use `guides/project_mainline.md` as the first document for understanding the intended direction.
+Use `guides/project_mainline.md` as the first document for understanding the intended direction. The other documents should be read as parts of that loop, not as unrelated utilities.
 
 ## Guides
 
 - `guides/project_mainline.md`: top-level closed-loop project direction and engineering contract.
-- `guides/environment.md`: machine, conda, ROS, CuRobo, and headless validation environment.
-- `guides/runtime.md`: planner runtime behavior and CLI/Python entrypoints.
-- `guides/dataset_training.md`: dataset export, artifact pointers, and diffusion/critic training workflow.
-- `guides/ros_adapter.md`: optional ROS adapter usage and boundaries.
+- `guides/environment.md`: machine, conda, ROS, CuRobo, and headless environment for offline generation and online validation.
+- `guides/runtime.md`: online-loop behavior, CLI/Python entrypoints, learned-seed validation, and rule fallback.
+- `guides/dataset_training.md`: offline-loop dataset export, artifact pointers, diffusion/critic training, and data update workflow.
+- `guides/ros_adapter.md`: optional online task ingress around the same planner core.
 
 ## Reference
 
-- `reference/api_schema.md`: request/result schema used by the pure planner core and CLI.
+- `reference/api_schema.md`: request/result schema used by the pure planner core, CLI, dataset records, and feedback loop.
 
 ## Design
 
