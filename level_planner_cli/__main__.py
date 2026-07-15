@@ -1,10 +1,7 @@
-"""CLI placeholder; implemented in phase 3."""
+"""Compatibility entrypoint for the standalone planner CLI."""
 
-
-def main() -> int:
-    raise SystemExit("level_planner_cli is implemented in phase 3.")
+from level_planner.cli import main
 
 
 if __name__ == "__main__":
-    main()
-
+    raise SystemExit(main())

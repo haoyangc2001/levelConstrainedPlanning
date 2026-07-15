@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "request_id": "request_level_001",
+  "robot_profile": "sr5",
+  "start_joint": [
+    -0.767454,
+    1.513525,
+    0.061584,
+    2.179733,
+    3.29759,
+    1.407887
+  ],
+  "target_pose": {
+    "position": [
+      -0.18,
+      -0.17,
+      0.45
+    ],
+    "quaternion_wxyz": [
+      0.653281,
+      -0.653281,
+      0.270598,
+      -0.270598
+    ],
+    "frame_id": "world",
+    "tool_frame": "tool1"
+  },
+  "alignment": {
+    "local_axis": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "target_world_axis": [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    "tolerance_deg": 15.0,
+    "strict_level": true
+  },
+  "world": {
+    "obstacle_json": "configs/obstacles/abs.autosave.json",
+    "obstacle_rel_json": "configs/obstacles/rel.autosave.json"
+  },
+  "seed_policy": {
+    "mode": "rule",
+    "k_generate": 0,
+    "k_accept": 0,
+    "fallback_to_rule_seed": true,
+    "timeout_sec": 0.2
+  },
+  "metadata": {
+    "description": "Phase 3 smoke request copied from a phase10 validator-valid SR5 candidate sample."
+  }
+}
