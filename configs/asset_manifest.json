@@ -1,0 +1,39 @@
+{
+  "schema_version": "standalone_level_planning.asset_manifest.v1",
+  "robot_profile": "sr5",
+  "source_project": "resource/config/Level_Test_V2_caohy",
+  "required_assets": {
+    "planner_config": "configs/sr5_level.yaml",
+    "robot_config": "configs/robot/xms5_r800_w4g3b4c_v2.yml",
+    "urdf": "configs/robot/curobo/xms5_r800_w4g3b4c.urdf",
+    "collision_spheres": "configs/robot/spheres/xms5_r800_w4g3b4c_spherized.yml",
+    "mesh_dir": "configs/robot/curobo/meshes/xms5_r800_w4g3b4c_meshes",
+    "obstacle_json": "configs/obstacles/abs.autosave.json",
+    "obstacle_rel_json": "configs/obstacles/rel.autosave.json"
+  },
+  "request_fixtures": [
+    {
+      "path": "examples/requests/request_level_001.json",
+      "expected_status": "success",
+      "purpose": "phase10 validator-valid easy success smoke"
+    },
+    {
+      "path": "examples/requests/request_level_alignment_hard.json",
+      "expected_status": "failed_alignment_constraint",
+      "purpose": "same target as success fixture but strict 3 degree alignment tolerance"
+    },
+    {
+      "path": "examples/requests/request_level_planner_fail.json",
+      "expected_status": "failed_planner",
+      "purpose": "phase10 request_failure target used to verify structured planner failure"
+    }
+  ],
+  "excluded_assets": [
+    "CR7 robot assets",
+    "rviz configs",
+    "vision configs",
+    "state machine yaml",
+    "camera calibration samples",
+    "scene mesh marker configs"
+  ]
+}
