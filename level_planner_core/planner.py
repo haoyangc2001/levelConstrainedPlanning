@@ -14,7 +14,7 @@ from typing import Any
 import torch
 import yaml
 
-from . import constraints
+from . import constraints, validators
 from .result_schema import (
     CandidateRecord,
     PlannerArtifacts,
@@ -55,6 +55,12 @@ class LevelPlannerConfig:
     local_axis: list[float] = field(default_factory=lambda: [0.0, 1.0, 0.0])
     target_world_axis: list[float] = field(default_factory=lambda: [0.0, 0.0, -1.0])
     speed_scale: float = 0.5
+    goal_position_tolerance_m: float = 0.02
+    goal_orientation_tolerance_rad: float = 0.20
+    max_start_gap_l2: float = 0.25
+    max_joint_step_l2: float = 2.0
+    max_joint_step_abs: float = 1.5
+    max_acceleration_proxy_l2: float = 3.0
     diffusion_generated_samples_path: str = (
         "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/"
         "sr5_phase10_mature_diffusion_20260715_generated_samples.json"
@@ -95,6 +101,12 @@ class LevelPlannerConfig:
             "local_axis",
             "target_world_axis",
             "speed_scale",
+            "goal_position_tolerance_m",
+            "goal_orientation_tolerance_rad",
+            "max_start_gap_l2",
+            "max_joint_step_l2",
+            "max_joint_step_abs",
+            "max_acceleration_proxy_l2",
             "diffusion_generated_samples_path",
             "diffusion_checkpoint_path",
         ):
@@ -119,6 +131,7 @@ class LevelConstrainedPlanner:
         self._tool_frames: list[str] = []
         self._robot_cfg: dict[str, Any] | None = None
         self._world_summary: dict[str, Any] = {}
+        self._joint_limits: list[dict[str, Any]] = []
         self._init_curobo()
 
     @classmethod
@@ -147,6 +160,10 @@ class LevelConstrainedPlanner:
         )
         self._joint_names = list(self._planner.joint_names)
         self._tool_frames = list(self._planner.tool_frames)
+        self._joint_limits = validators.load_joint_limits_from_robot_config(
+            Path(self.config.robot_config),
+            self._joint_names,
+        )
 
         world_result = build_world(
             abs_json_path=Path(self.config.obstacle_json) if self.config.obstacle_json else None,
@@ -425,12 +442,21 @@ class LevelConstrainedPlanner:
             item for item in candidate_summaries if item.get("status") == "success"
         ]
         for idx, item in enumerate(successful_summaries):
+            goal_metrics = self._summarize_terminal_goal(positions[idx], request["target_pose"])
             item["metrics"] = {
                 "max_alignment_deviation_deg": selection["candidate_max_alignment_deviation"][idx],
+                "mean_alignment_deviation_deg": round(float(level_eval["mean_alignment_deviation"][idx].item()), 4),
                 "start_joint_gap_l2": selection["candidate_start_joint_gap_l2"][idx],
                 "joint_step_jump_cost": selection["candidate_joint_step_jump_cost"][idx],
                 "joint_step_max_l2": selection["candidate_joint_step_max_l2"][idx],
+                "joint_step_max_abs": selection["candidate_joint_step_max_abs"][idx],
                 "twist_smoothness_cost": selection["candidate_twist_smoothness_cost"][idx],
+                "position_error_m": goal_metrics["terminal_position_error_m"],
+                "orientation_error_rad": goal_metrics["terminal_orientation_error_rad"],
+                "orientation_error_deg": round(
+                    float(goal_metrics["terminal_orientation_error_rad"]) * 180.0 / 3.141592653589793,
+                    6,
+                ),
                 "selected": idx == selected_index,
             }
         status = STATUS_SUCCESS if selection["planning_status"] == "success" else STATUS_FAILED_ALIGNMENT
@@ -453,8 +479,15 @@ class LevelConstrainedPlanner:
                     final_status=status,
                     final_failure_reason=selection.get("failure_reason"),
                     alignment_tolerance_deg=float(alignment["tolerance_deg"]),
+                    start_joint=request["start_joint"],
                 )
             )
+        selected_validation = {}
+        for record in candidate_records:
+            if record.get("candidate_id") == selected_candidate_id:
+                selected_validation = dict(record.get("validator_metrics") or {})
+                break
+        selected_checks = selected_validation.get("checks") or {}
         return PlannerResult(
             request_id=request_id,
             status=status,
@@ -481,8 +514,11 @@ class LevelConstrainedPlanner:
                     "selected_twist_smoothness_cost": selection.get("selected_twist_smoothness_cost"),
                 },
                 "joint_limit": {
-                    "status": "not_evaluated_in_phase3_minimal_core"
+                    **dict(selected_checks.get("joint_limit") or {}),
                 },
+                "collision_safety": dict(selected_checks.get("collision_safety") or {}),
+                "velocity_acceleration": dict(selected_checks.get("velocity_acceleration") or {}),
+                "hard_validator": selected_validation,
                 "world": dict(self._world_summary),
             },
             seed_provider_reports=seed_reports,
@@ -544,6 +580,7 @@ class LevelConstrainedPlanner:
                 "tolerance_deg", self.config.level_tolerance_deg
             )
         )
+        start_joint = list((normalized_request or {}).get("start_joint") or [])
         if not result.candidate_records:
             result.candidate_records = [
                 self._build_candidate_record_from_summary(
@@ -554,6 +591,7 @@ class LevelConstrainedPlanner:
                     final_status=result.status,
                     final_failure_reason=result.failure_reason,
                     alignment_tolerance_deg=alignment_tolerance,
+                    start_joint=start_joint,
                 )
                 for item in result.candidates
             ]
@@ -629,6 +667,7 @@ class LevelConstrainedPlanner:
         final_status: str,
         final_failure_reason: str | None,
         alignment_tolerance_deg: float,
+        start_joint: list[float],
     ) -> dict[str, Any]:
         candidate_id = str(summary.get("candidate_id") or f"candidate_{len(summary)}")
         source_type = self._normalize_source_type(summary.get("source_type") or summary.get("source_label"))
@@ -638,34 +677,34 @@ class LevelConstrainedPlanner:
         selected = bool(metrics.get("selected") or summary.get("selected"))
         optimizer_success = status == "success"
         max_alignment = metrics.get("max_alignment_deviation_deg")
-        alignment_valid = True
-        if max_alignment is not None:
-            try:
-                alignment_valid = float(max_alignment) <= float(alignment_tolerance_deg)
-            except Exception:
-                alignment_valid = False
-        validator_valid = bool(optimizer_success and alignment_valid)
         failure_stage = None
         failure_reason = summary.get("failure_reason") or None
         if not optimizer_success:
             failure_stage = "repair"
             failure_reason = failure_reason or status
-        elif not validator_valid:
-            failure_stage = "validation"
-            failure_reason = final_failure_reason or "failed_alignment_constraint"
         trajectory_points = self._trajectory_tensor_to_list(trajectory) if trajectory is not None else []
         trajectory_shape = [
             len(trajectory_points),
             len(trajectory_points[0]) if trajectory_points else 0,
         ]
-        validator_metrics = {
-            "status": "valid" if validator_valid else "failed",
-            "valid": validator_valid,
-            "alignment_tolerance_deg": float(alignment_tolerance_deg),
-            "max_alignment_deviation_deg": max_alignment,
-            "failure_reason": None if validator_valid else failure_reason,
-            "metrics": metrics,
-        }
+        validator_metrics = validators.evaluate_hard_constraints(
+            trajectory_points=trajectory_points,
+            start_joint=start_joint,
+            joint_limits=self._joint_limits,
+            metrics=metrics,
+            alignment_tolerance_deg=float(alignment_tolerance_deg),
+            optimizer_success=optimizer_success,
+            world_summary=self._world_summary,
+            thresholds=self._validator_thresholds(),
+        )
+        validator_valid = bool(validator_metrics.get("valid"))
+        if optimizer_success and not validator_valid:
+            failure_stage = "validation"
+            failure_reason = str(
+                validator_metrics.get("failure_reason")
+                or final_failure_reason
+                or "hard_validator_failed"
+            )
         positive_for_critic = bool(validator_valid and selected and final_status == STATUS_SUCCESS)
         labels = {
             "planner_status": final_status,
@@ -719,6 +758,16 @@ class LevelConstrainedPlanner:
             failure_reason=failure_reason,
             metrics=metrics,
         ).to_dict()
+
+    def _validator_thresholds(self) -> dict[str, float]:
+        return {
+            "goal_position_tolerance_m": float(self.config.goal_position_tolerance_m),
+            "goal_orientation_tolerance_rad": float(self.config.goal_orientation_tolerance_rad),
+            "max_start_gap_l2": float(self.config.max_start_gap_l2),
+            "max_joint_step_l2": float(self.config.max_joint_step_l2),
+            "max_joint_step_abs": float(self.config.max_joint_step_abs),
+            "max_acceleration_proxy_l2": float(self.config.max_acceleration_proxy_l2),
+        }
 
     @staticmethod
     def _normalize_source_type(source_type: Any) -> str:

@@ -303,15 +303,15 @@
       "id": 2,
       "name": "硬约束验证器补齐",
       "priority": "P0",
-      "status": "not_started",
-      "completed": false,
+      "status": "completed",
+      "completed": true,
       "objective": "把当前 alignment/continuity 选择器升级为闭环系统统一 hard validator，所有 rule、learned、fallback 候选使用同一验收口径。",
       "tasks": [
         {
           "id": "2.1",
           "description": "补齐 joint limit 验证。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "1.1"
           ],
@@ -324,8 +324,8 @@
         {
           "id": "2.2",
           "description": "补齐碰撞/安全距离指标。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "2.1"
           ],
@@ -338,8 +338,8 @@
         {
           "id": "2.3",
           "description": "补齐速度、加速度和轨迹连续性硬门控。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "2.1"
           ],
@@ -352,8 +352,8 @@
         {
           "id": "2.4",
           "description": "统一 selector 和 validator 输出。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "2.1",
             "2.2",
@@ -375,6 +375,23 @@
         "result metrics 中 joint_limit 不再是 not_evaluated。",
         "每个候选都有 validator status。",
         "失败原因可以区分 alignment、collision、joint_limit、continuity、planner_internal。"
+      ],
+      "actual_outputs": [
+        "level_planner_core/validators.py 新增统一 hard validation helper。",
+        "planner 初始化时从 SR5 URDF 解析 joint limit，并写入候选级 validator_metrics。",
+        "candidate labels 统一由 hard validator 派生 positive_for_diffusion、positive_for_critic、negative_for_critic。",
+        "run metrics 增加 selected 候选的 joint_limit、collision_safety、velocity_acceleration、hard_validator。",
+        "tests/test_validators.py 覆盖 URDF joint limit 加载、越界检测和完整 hard validation 报告。",
+        "runs/phase2_hard_validator_smoke/candidate_samples.jsonl",
+        "runs/phase2_hard_validator_smoke/manifest.json",
+        "runs/phase2_hard_validator_smoke/validation_report.json"
+      ],
+      "verification": [
+        "python3 -m compileall level_planner_core level_planner tools tests",
+        "PYTHONPATH=$PWD PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q tests/test_candidate_dataset.py tests/test_import_smoke.py tests/test_constraints_smoke.py tests/test_validators.py",
+        "Phase 2 headless planner smoke 导出 2 条 candidate 样本，其中 positive_for_diffusion=1、negative_for_critic=1。",
+        "成功候选 joint_limit_status=valid、velocity_status=valid、collision_status=unchecked；失败候选保留 missing_trajectory/failed_planner 负样本信息。",
+        "TrajectorySeedDataset 与 SuccessCriticDataset 可读取 Phase 2 smoke 数据。"
       ]
     },
     {
