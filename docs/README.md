@@ -30,3 +30,7 @@ Use `guides/project_mainline.md` as the first document for understanding the int
 ## Reports
 
 - `reports/source_phase10_training_report.md`: source-project phase 10 SR5 mature offline model report and artifact summary.
+
+## Plans
+
+- `plan/closed_loop_system_implementation_plan.json`: detailed implementation plan for completing the closed-loop learning-optimization system.

@@ -1,0 +1,914 @@
+{
+  "project_name": "Level Constrained Planning 闭环学习优化系统实施计划",
+  "created_date": "2026-07-15",
+  "last_updated": "2026-07-15",
+  "project_scope": {
+    "target_repository": "/home/caohy/repositories/levelConstrainedPlanning",
+    "source_repository": "/home/caohy/repositories/tashan_Manipulation",
+    "core_goal": "把当前轻量 SR5 水平约束规划项目从“可验证规划核心 + 离线学习工具链”推进为完整的闭环学习优化系统：数据生成 -> 模型学习 -> 优化验收 -> 失败回退 -> 数据更新。",
+    "target_system_flow": {
+      "offline": [
+        "任务场景采样",
+        "规则化种子构建 + cuRobo 优化",
+        "轨迹数据集沉淀",
+        "扩散种子模型与 Success Critic 训练"
+      ],
+      "online": [
+        "在线任务输入",
+        "学习模型生成 trajectory seed",
+        "cuRobo 优化与硬约束验收",
+        "成功输出最终轨迹或失败回退到规则化种子搜索",
+        "在线结果回流数据集"
+      ]
+    },
+    "first_supported_robot": "sr5",
+    "first_supported_constraint": "tool1 y+ 对齐 world z- 的末端水平约束"
+  },
+  "stable_constraints": [
+    "扩散模型和 Success Critic 只产生或筛选 trajectory seed，不直接输出最终可执行轨迹。",
+    "所有 learned seed 和 rule seed 都必须经过 cuRobo repair 与 hard validation 后才能被视为成功候选。",
+    "失败样本、失败原因、回退路径和优化耗时都是一等数据，不允许只保留成功轨迹。",
+    "大规模数据集、generated samples、lifecycle logs、benchmark bundles 和 checkpoint 文件默认存放在 /pub/data/caohy/levelConstrainedPlanning 或外部 artifact store，不进入 git。",
+    "level_planner_core 不能依赖 ROS、RViz、motion 状态机、external_comm、真实机器人 driver 或产品业务模块。",
+    "ROS adapter 只允许作为在线任务入口和结果落盘层，不允许绕过 core planner、cuRobo repair、hard validation 或 fallback 记录。",
+    "无显示服务器是默认验证环境；RViz 不能作为本项目的验收条件。",
+    "真实机器人执行不属于本计划第一目标；如后续接入，必须先通过 plan-only、dry-run 和 safety checklist。"
+  ],
+  "current_baseline": {
+    "repository_status": "main 已同步到 origin/main，当前轻量仓库已具备独立 core、CLI、ROS adapter、docs、reports、artifact pointer 和 smoke matrix。",
+    "implemented_capabilities": [
+      "LevelConstrainedPlanner.plan() 可以加载 SR5 配置，调用 CuRobo V2 plan_pose，输出 result/candidate/lifecycle artifacts。",
+      "当前 hard validation 已覆盖末端轴对齐、目标终点误差和关节连续性/跳变/twist 平滑指标。",
+      "seed_policy 已有 mode、k_generate、k_accept、fallback_to_rule_seed 字段。",
+      "FileDiffusionSeedProvider 可以读取离线 generated_samples 文件并做基础 precheck，但目前只用于 shadow report。",
+      "artifacts/current_artifacts.json 已指向 phase10 dataset、diffusion checkpoint、critic checkpoint、generated samples 和 offline generation report。",
+      "tools/learning/diffusion_seed_learning 已有 diffusion 训练、采样、预检评估、critic 训练与 critic ablation 工具。",
+      "scripts/headless_smoke.py 已覆盖 static、CLI single、batch、diffusion smoke 和 ROS adapter check。"
+    ],
+    "known_gaps": [
+      "规则化水平种子族尚未作为真实 SeedProvider 迁入 standalone core；当前 rule_seed 只是 fallback_available 报告。",
+      "diffusion/mixed 模式当前被降级为 shadow，模型 seed 不进入 cuRobo 候选池。",
+      "当前 planner 只调用 cuRobo plan_pose 原生路径，没有把外部 trajectory seed 传入 cuRobo repair。",
+      "fallback_to_rule_seed 目前只是策略字段，没有形成 learned seed 失败后的实际回退控制流。",
+      "joint limit、collision distance、安全距离、速度/加速度、真实 optimize-time 等 hard validation 指标尚未完整落盘。",
+      "export_core_results_dataset.py 只导出 selected trajectory，且 sample_type=core_result，不能被现有 TrajectorySeedDataset 直接作为 candidate 样本消费。",
+      "critic 当前 collision_risk 为占位，expected_opt_time_ms 为 proxy，尚未接入在线候选排序。",
+      "还缺少任务场景批量采样、数据版本 manifest、在线结果自动回流和周期训练编排。"
+    ],
+    "external_artifact_baseline": {
+      "dataset": "sr5_phase10_20260715_baseline_jitter_train",
+      "sample_count": 993,
+      "candidate_count": 833,
+      "positive_for_diffusion": 140,
+      "positive_for_critic": 140,
+      "diffusion_checkpoint": "sr5_phase10_mature_diffusion_20260715",
+      "critic_checkpoint": "sr5_phase10_success_critic_20260715"
+    }
+  },
+  "recommended_execution_order": [
+    "0. 先冻结闭环数据契约和 cuRobo 外部 seed repair 可行性，避免后续 provider、dataset、critic 之间字段不一致。",
+    "1. 先补 planner run / candidate / dataset schema 和完整 artifact logging，使后续所有阶段都能产生可回流数据。",
+    "2. 再补 hard validator，保证 rule seed、diffusion seed、fallback seed 使用同一套验收标准。",
+    "3. 迁入规则化水平种子族，先建立可靠 fallback 和离线产数主力。",
+    "4. 打通外部 seed pool 到 cuRobo repair，让 rule/diffusion seed 真正参与优化。",
+    "5. 接入在线 diffusion inference 与 Success Critic 排序，但默认先 shadow，再 candidate。",
+    "6. 实现 learned-first / rule-fallback 在线控制流。",
+    "7. 建立任务采样、批量产数、数据回流、训练和 benchmark 的离线闭环。",
+    "8. 用固定时间预算 success@K、fallback recovery rate 和 hard validation 指标冻结第一版闭环基线。"
+  ],
+  "feasibility_gates": [
+    {
+      "id": "G0",
+      "name": "外部 trajectory seed 注入 cuRobo repair 可行性",
+      "status": "not_started",
+      "required_before_phase": 4,
+      "questions": [
+        "CuRobo V2 MotionPlanner 是否支持直接接收外部 cspace trajectory seed 或 seed trajectory batch？",
+        "如果 plan_pose 不能直接接收 trajectory seed，是否可以通过 motion planner config、seed tensor、cspace solve 或局部 repair API 达成等效功能？",
+        "外部 seed repair 后是否能保留每条 seed 的 source_lineage 和 per-candidate status？"
+      ],
+      "exit_criteria": [
+        "完成最小 spike：一条手工 seed 能被送入 CuRobo repair，并输出 success/failure 和 optimized trajectory。",
+        "确认无法直接注入时，给出 fallback 技术路线和影响范围。",
+        "形成 seed_repair_api_notes.md 或同等 JSON 结论记录。"
+      ]
+    },
+    {
+      "id": "G1",
+      "name": "闭环 candidate 数据契约可训练性",
+      "status": "not_started",
+      "required_before_phase": 7,
+      "questions": [
+        "standalone core 产出的 candidate JSONL 是否能被 diffusion dataset 和 critic dataset 无损读取？",
+        "失败 seed 是否保留 trajectory points、failure_reason、hard validation metrics 和 source_lineage？",
+        "positive_for_diffusion 与 positive_for_critic 标签口径是否与原 phase10 数据兼容？"
+      ],
+      "exit_criteria": [
+        "导出至少一个 success、一个 failed_alignment、一个 failed_planner、一个 learned-shadow candidate 的 JSONL。",
+        "TrajectorySeedDataset 和 SuccessCriticDataset 均能读取该 JSONL。",
+        "schema validation 和 smoke training 均通过。"
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "id": 0,
+      "name": "闭环契约冻结与迁移审计",
+      "priority": "P0",
+      "status": "not_started",
+      "completed": false,
+      "objective": "在正式实现前冻结闭环系统的数据契约、seed repair 可行性和源项目规则种子迁移边界。",
+      "tasks": [
+        {
+          "id": "0.1",
+          "description": "冻结 PlannerRunRecord、CandidateRecord、DatasetSampleRecord 三层 schema。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [],
+          "details": [
+            "明确 request、world、seed_provider、candidate、optimized_result、validator_metrics、fallback_trace、labels、artifacts 字段。",
+            "保证 standalone core 导出的 candidate 样本能直接被 diffusion/critic dataset 读取。",
+            "定义 positive_for_diffusion、positive_for_critic、negative_for_critic、fallback_recovered 等标签口径。"
+          ]
+        },
+        {
+          "id": "0.2",
+          "description": "审计 CuRobo V2 外部 seed repair API 可行性。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "0.1"
+          ],
+          "details": [
+            "用一条手工关节轨迹 seed 做最小 repair spike。",
+            "确认 seed batch 能否保持 source lineage。",
+            "记录可行 API、失败 API 和需要绕开的 CuRobo 限制。"
+          ]
+        },
+        {
+          "id": "0.3",
+          "description": "审计源项目规则化水平种子族的最小迁移闭包。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "0.1"
+          ],
+          "details": [
+            "定位 baseline horizontal seed、goal anchor variant、twist delayed、in-limit-best、split/smooth/bridge 的源代码和依赖。",
+            "划分可纯 Python 迁移的数学逻辑、依赖 CuRobo IK 的逻辑、依赖 ROS/状态机的逻辑。",
+            "形成 migration inventory，禁止把 motion、external_comm、state machine 依赖带入 core。"
+          ]
+        },
+        {
+          "id": "0.4",
+          "description": "冻结 hard validation 指标集合。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "0.1"
+          ],
+          "details": [
+            "保留现有 alignment、goal、continuity、twist 指标。",
+            "补充 joint limit、collision/safety distance、velocity/acceleration、solve time、optimizer status。",
+            "定义每个指标的 required/optional 状态和缺失时的 failure_reason。"
+          ]
+        }
+      ],
+      "deliverables": [
+        "docs/plan/closed_loop_schema_contract.json 或等价 schema 文档",
+        "docs/plan/seed_repair_api_notes.md 或 JSON 结论",
+        "docs/plan/rule_seed_migration_inventory.json"
+      ],
+      "exit_criteria": [
+        "外部 seed repair 技术路线已明确。",
+        "candidate dataset schema 能覆盖成功、失败、回退和 shadow learned seed。",
+        "规则种子迁移边界清晰，不会引入产品栈依赖。"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "闭环数据记录与导出基础设施",
+      "priority": "P0",
+      "status": "not_started",
+      "completed": false,
+      "objective": "让每次 planner run 都能生成可回流、可训练、可审计的候选级数据，而不是只导出最终 selected trajectory。",
+      "tasks": [
+        {
+          "id": "1.1",
+          "description": "在 result_schema 中新增候选级和运行级结构。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "0.1"
+          ],
+          "details": [
+            "新增 CandidateRecord，记录 source_type、source_label、provider、entered_pool、optimized、selected、trajectory artifact、metrics、failure_reason。",
+            "新增 PlannerRunRecord，记录 request、normalized request、world summary、seed_provider_reports、fallback_trace、timing summary。",
+            "保持现有 result.json 向后兼容。"
+          ]
+        },
+        {
+          "id": "1.2",
+          "description": "扩展 _write_artifacts，落盘完整 candidate 和 lifecycle 数据。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "1.1"
+          ],
+          "details": [
+            "candidate_summary.json 保留摘要，新增 candidates.jsonl 或 candidates_full.json 存储候选级详细记录。",
+            "大 trajectory points 可选择写入独立 artifact 文件，JSONL 中保存路径和 hash。",
+            "lifecycle.json 记录 learned-first、fallback、validator、selector 的完整顺序。"
+          ]
+        },
+        {
+          "id": "1.3",
+          "description": "重写 export_core_results_dataset.py 为 candidate dataset exporter。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "1.2"
+          ],
+          "details": [
+            "从 result.json、lifecycle.json、candidate artifacts 中展开每条 candidate。",
+            "输出 sample_type=candidate，兼容 TrajectorySeedDataset 和 SuccessCriticDataset。",
+            "失败样本保留 trajectory points、失败阶段、failure_reason 和 validator metrics。",
+            "导出 manifest，记录样本数、正负样本数、source_type 分布、hash、输入目录。"
+          ]
+        },
+        {
+          "id": "1.4",
+          "description": "补充 schema validator 和小样本回归测试。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "1.3"
+          ],
+          "details": [
+            "新增 tools/dataset/validate_candidate_dataset.py。",
+            "覆盖 success、failed_alignment_constraint、failed_planner、diffusion_shadow 四类样本。",
+            "CI/smoke 中验证导出的 JSONL 能被 diffusion 和 critic dataset 读取。"
+          ]
+        }
+      ],
+      "deliverables": [
+        "level_planner_core/result_schema.py 的候选级记录扩展",
+        "完整 lifecycle/candidate artifacts",
+        "tools/dataset/export_candidate_dataset.py 或升级后的 export_core_results_dataset.py",
+        "dataset schema validator 与测试样本"
+      ],
+      "exit_criteria": [
+        "一次 headless run 能导出 candidate JSONL。",
+        "导出 JSONL 同时包含成功和失败候选。",
+        "learning dataset loader 可以读取 standalone 导出的样本。"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "硬约束验证器补齐",
+      "priority": "P0",
+      "status": "not_started",
+      "completed": false,
+      "objective": "把当前 alignment/continuity 选择器升级为闭环系统统一 hard validator，所有 rule、learned、fallback 候选使用同一验收口径。",
+      "tasks": [
+        {
+          "id": "2.1",
+          "description": "补齐 joint limit 验证。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "1.1"
+          ],
+          "details": [
+            "从 robot config 读取 joint limits。",
+            "输出 min_margin、max_violation、per_joint_violation。",
+            "将 joint limit 失败写入 candidate failure_reason。"
+          ]
+        },
+        {
+          "id": "2.2",
+          "description": "补齐碰撞/安全距离指标。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "2.1"
+          ],
+          "details": [
+            "优先复用 CuRobo world/collision API 输出环境碰撞和自碰撞风险。",
+            "至少记录 collision_valid、min_distance_proxy 或 collision_cost_proxy。",
+            "若 V2 API 暂时不能给出精确距离，先落盘透明 proxy 字段和 limitation。"
+          ]
+        },
+        {
+          "id": "2.3",
+          "description": "补齐速度、加速度和轨迹连续性硬门控。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "2.1"
+          ],
+          "details": [
+            "基于离散轨迹点计算 joint_step、velocity_proxy、acceleration_proxy。",
+            "定义默认阈值和 strict/best_effort 行为。",
+            "将 jump_bad、velocity_bad、acceleration_bad 与 alignment/collision failure 分开记录。"
+          ]
+        },
+        {
+          "id": "2.4",
+          "description": "统一 selector 和 validator 输出。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "2.1",
+            "2.2",
+            "2.3"
+          ],
+          "details": [
+            "先硬过滤 alignment、collision、joint limit、continuity。",
+            "再在有效候选内按 start gap、jump、twist、path cost、optimizer cost 排序。",
+            "对所有失败候选输出 failure_stage 和 failure_reason。"
+          ]
+        }
+      ],
+      "deliverables": [
+        "level_planner_core/validators.py 或 constraints.py 中的统一 hard validator",
+        "候选级 validator_metrics schema",
+        "validator smoke tests"
+      ],
+      "exit_criteria": [
+        "result metrics 中 joint_limit 不再是 not_evaluated。",
+        "每个候选都有 validator status。",
+        "失败原因可以区分 alignment、collision、joint_limit、continuity、planner_internal。"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "规则化水平种子族迁入 standalone core",
+      "priority": "P0",
+      "status": "not_started",
+      "completed": false,
+      "objective": "把源项目已验证的规则化水平种子能力迁入轻量项目，作为离线产数主力和在线 fallback 基线。",
+      "tasks": [
+        {
+          "id": "3.1",
+          "description": "实现 RuleSeedProvider 基础框架。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "0.3",
+            "1.1"
+          ],
+          "details": [
+            "遵循 SeedProvider 协议，输出 SeedProviderResult 和 SeedCandidate。",
+            "支持 rule_seed_families 配置开关、k_generate、k_accept、timeout。",
+            "所有候选都带 source_type=rule 或 rule_raw。"
+          ]
+        },
+        {
+          "id": "3.2",
+          "description": "迁入基准水平种子生成。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "3.1"
+          ],
+          "details": [
+            "实现笛卡尔位置插值和目标姿态 + tool y twist 插值。",
+            "保留 tool1 y+ -> world z- 约束语义。",
+            "生成完整关节空间 seed trajectory，若 IK 不可用则记录失败样本。"
+          ]
+        },
+        {
+          "id": "3.3",
+          "description": "迁入 IK anchor、twist delayed、in-limit-best 变体。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "3.2"
+          ],
+          "details": [
+            "用不同目标构型 anchor 覆盖 IK 分支。",
+            "用 twist delayed 降低起点附近突扭。",
+            "用 in-limit-best 优先选择远离关节限位的分支。"
+          ]
+        },
+        {
+          "id": "3.4",
+          "description": "迁入分段、平滑和桥接候选。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "3.3",
+            "2.3"
+          ],
+          "details": [
+            "检测最大 joint jump 后生成 split seed。",
+            "对局部窗口做线性平滑或桥接。",
+            "默认先 shadow 记录，再按验证结果决定是否 candidate。"
+          ]
+        },
+        {
+          "id": "3.5",
+          "description": "建立 rule seed 回归矩阵。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "3.4"
+          ],
+          "details": [
+            "至少覆盖 3 个 fixture：success、alignment-hard、planner-fail。",
+            "新增一组规则种子成功但 planner native 失败的困难样例。",
+            "记录每个 family 的 generated/valid/selected/failure 分布。"
+          ]
+        }
+      ],
+      "deliverables": [
+        "level_planner_core/rule_seed_provider.py",
+        "configs/rule_seed_families.yaml 或 sr5_level.yaml 中的 rule seed 配置段",
+        "rule seed smoke reports"
+      ],
+      "exit_criteria": [
+        "rule_seed 不再报告 not_generated_in_phase3_minimal_core。",
+        "规则种子候选能完整进入 lifecycle artifacts。",
+        "至少一个 fixture 展示 rule seed 候选经过 hard validator。"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "外部 seed pool 与 cuRobo repair 接通",
+      "priority": "P0",
+      "status": "not_started",
+      "completed": false,
+      "objective": "让 rule seed、diffusion seed 与 cuRobo native seed 进入统一候选池，并实际经过 cuRobo repair，而不是只做 shadow 记录。",
+      "tasks": [
+        {
+          "id": "4.1",
+          "description": "实现 SeedRepairAdapter。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "G0",
+            "2.4",
+            "3.1"
+          ],
+          "details": [
+            "封装 CuRobo 外部 seed repair 调用。",
+            "输入 SeedCandidate，输出 repaired trajectory、optimizer status、timing、failure_reason。",
+            "保留原始 seed 和 repaired candidate 的 source_lineage。"
+          ]
+        },
+        {
+          "id": "4.2",
+          "description": "重构 _collect_planner_candidates 为统一候选池。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "4.1"
+          ],
+          "details": [
+            "候选来源包括 planner_native、rule_seed、diffusion_seed。",
+            "每条候选都经过 repair -> hard validation -> selector。",
+            "candidate mode 下 learned/rule seed 必须 entered_pool=true。"
+          ]
+        },
+        {
+          "id": "4.3",
+          "description": "保留 shadow/candidate 双模式。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "4.2"
+          ],
+          "details": [
+            "shadow：生成并预检 seed，但不进入 repair pool。",
+            "candidate：seed 进入 repair pool，失败也记录为候选样本。",
+            "mixed：planner_native + learned + rule 按配置合并。"
+          ]
+        },
+        {
+          "id": "4.4",
+          "description": "扩展 headless smoke 验证 candidate 模式。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "4.3"
+          ],
+          "details": [
+            "新增 rule_candidate、diffusion_file_candidate、mixed_candidate 三个 smoke case。",
+            "验证 entered_pool、optimized、selected、failure_reason 字段。",
+            "保留当前 shadow case 作为兼容检查。"
+          ]
+        }
+      ],
+      "deliverables": [
+        "SeedRepairAdapter",
+        "统一 candidate pool",
+        "candidate-mode smoke matrix"
+      ],
+      "exit_criteria": [
+        "file-backed diffusion seed 至少能以 candidate 模式进入 repair pool。",
+        "rule seed 至少能以 candidate 模式进入 repair pool。",
+        "candidate artifacts 能区分 raw seed、repaired candidate 和 selected final trajectory。"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "在线 learned seed inference 与 Success Critic 接入",
+      "priority": "P1",
+      "status": "not_started",
+      "completed": false,
+      "objective": "把当前离线模型资产从文件回放提升为按当前 request 生成 seed，并用 critic 做质量与多样性筛选。",
+      "tasks": [
+        {
+          "id": "5.1",
+          "description": "实现 CheckpointDiffusionSeedProvider。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "4.3"
+          ],
+          "details": [
+            "加载 artifacts/current_artifacts.json 指向的 diffusion checkpoint。",
+            "基于当前 request 构造 condition。",
+            "并行采样 K' 条 seed，执行 q0 inpainting、连续性恢复和基础 precheck。"
+          ]
+        },
+        {
+          "id": "5.2",
+          "description": "统一训练/推理 condition builder。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "5.1",
+            "1.3"
+          ],
+          "details": [
+            "修正当前 build_condition 对旧 source schema 的依赖。",
+            "支持 start_joint、target_pose、alignment、primitive obstacle summary。",
+            "保证训练 dataset、sample.py 和 runtime provider 使用同一 condition 逻辑。"
+          ]
+        },
+        {
+          "id": "5.3",
+          "description": "接入 Success Critic 在线排序。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "5.1",
+            "5.2"
+          ],
+          "details": [
+            "加载 critic checkpoint 与 normalization。",
+            "输出 success probability、alignment risk、collision risk、joint jump risk、expected optimize time。",
+            "用质量分 + 多样性贪心选择 K 条进入 cuRobo repair。"
+          ]
+        },
+        {
+          "id": "5.4",
+          "description": "建立 learned seed 安全开关。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "5.3"
+          ],
+          "details": [
+            "默认 mode=off 或 shadow；candidate 需要显式配置。",
+            "真实机器人相关入口默认禁止 learned seed candidate。",
+            "超时、checkpoint missing、critic missing 时自动降级到 rule fallback 并记录原因。"
+          ]
+        }
+      ],
+      "deliverables": [
+        "CheckpointDiffusionSeedProvider",
+        "runtime condition builder",
+        "online Success Critic selector",
+        "learned seed safety switches"
+      ],
+      "exit_criteria": [
+        "给定当前 request，模型能在线生成 K' 条 seed。",
+        "critic 能筛选 K 条进入 repair pool。",
+        "模型/critic 失败不会阻断规则 fallback。"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "在线 learned-first 与规则回退控制流",
+      "priority": "P0",
+      "status": "not_started",
+      "completed": false,
+      "objective": "实现图片中在线路径的核心闭环：优先模型 seed，失败后回退规则化种子搜索，最终输出或结构化失败，并完整记录数据。",
+      "tasks": [
+        {
+          "id": "6.1",
+          "description": "实现 learned-first planner controller。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "4.3",
+            "5.4"
+          ],
+          "details": [
+            "当 mode=diffusion 或 mixed 时，先执行 learned seed generation、critic selection、repair、validation。",
+            "若有 learned candidate 通过 hard validation，按 selector 输出最终轨迹。",
+            "记录 learned_attempt_summary。"
+          ]
+        },
+        {
+          "id": "6.2",
+          "description": "实现 rule fallback branch。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "6.1",
+            "3.5"
+          ],
+          "details": [
+            "当 learned branch 无有效候选且 fallback_to_rule_seed=true 时触发。",
+            "可扩大 rule k_generate、启用更多 seed family 或放宽非硬排序参数。",
+            "记录 fallback_trigger_reason、fallback_candidates、fallback_selected。"
+          ]
+        },
+        {
+          "id": "6.3",
+          "description": "完善最终 status 与 failure taxonomy。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "6.2"
+          ],
+          "details": [
+            "保持现有 success/failed_* 兼容。",
+            "在 metrics 或 lifecycle 中区分 success_source=learned/rule_fallback/planner_native。",
+            "失败原因区分 learned_generation_failed、learned_validation_failed、fallback_validation_failed、repair_failed、hard_validator_failed。"
+          ]
+        },
+        {
+          "id": "6.4",
+          "description": "加入时间预算管理。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "6.2"
+          ],
+          "details": [
+            "定义 total_budget_ms、learned_budget_ms、fallback_budget_ms。",
+            "超时不丢数据，记录 partial candidates 和 timeout stage。",
+            "后续 benchmark 按固定预算评估 success@K。"
+          ]
+        }
+      ],
+      "deliverables": [
+        "learned-first/fallback planner control flow",
+        "fallback_trace lifecycle schema",
+        "timeout-aware planner result"
+      ],
+      "exit_criteria": [
+        "learned seed 全失败时能自动回退 rule seed。",
+        "回退成功和回退失败都能导出 candidate dataset。",
+        "CLI 输出能清晰说明最终轨迹来自 learned、rule fallback 或 planner native。"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "离线任务采样与批量产数管线",
+      "priority": "P1",
+      "status": "not_started",
+      "completed": false,
+      "objective": "实现图片中离线路径的前半段：任务场景采样、规则种子 + cuRobo 优化、轨迹数据集沉淀。",
+      "tasks": [
+        {
+          "id": "7.1",
+          "description": "实现任务场景采样器。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "2.4"
+          ],
+          "details": [
+            "采样 start_joint、target_pose、obstacle layout、level constraint。",
+            "支持固定 seed、difficulty bucket、无障碍/单障碍/多障碍场景。",
+            "输出 request JSONL 和 sampling manifest。"
+          ]
+        },
+        {
+          "id": "7.2",
+          "description": "实现批量 lifecycle runner。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "6.2",
+            "7.1"
+          ],
+          "details": [
+            "批量运行 standalone CLI/core。",
+            "每个 request 独立 out_dir，避免大文件进入 git。",
+            "支持 resume、失败重试、GPU 选择、进度 summary。"
+          ]
+        },
+        {
+          "id": "7.3",
+          "description": "生成第一版 standalone 闭环数据集。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "7.2",
+            "1.3"
+          ],
+          "details": [
+            "产出包含 planner_native、rule、learned_shadow/candidate、fallback 的候选样本。",
+            "按 source_type、status、failure_reason、difficulty bucket 统计。",
+            "存放到 /pub/data/caohy/levelConstrainedPlanning/datasets/<dataset_name>。"
+          ]
+        },
+        {
+          "id": "7.4",
+          "description": "建立数据集版本和 manifest 规范。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "7.3"
+          ],
+          "details": [
+            "manifest 记录 request_count、candidate_count、positive/negative、source distribution、hash、生成命令和 git commit。",
+            "repo 内只提交 artifact pointer，不提交 JSONL 大文件。",
+            "支持 current_artifacts.json 指向最新闭环数据集。"
+          ]
+        }
+      ],
+      "deliverables": [
+        "tools/dataset/sample_tasks.py",
+        "tools/dataset/run_lifecycle_batch.py",
+        "/pub/data/caohy/levelConstrainedPlanning/datasets/<dataset_name>/samples_validated.jsonl",
+        "dataset manifest 和 summary report"
+      ],
+      "exit_criteria": [
+        "能从零生成一批 request 并运行到 candidate JSONL。",
+        "数据集包含成功、失败、回退样本。",
+        "数据集可以直接训练 diffusion 和 critic。"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "模型训练、评估与 artifact 更新闭环",
+      "priority": "P1",
+      "status": "not_started",
+      "completed": false,
+      "objective": "让新数据集能周期性训练 diffusion/critic，并用 cuRobo 验证口径评估模型 seed 是否优于规则 baseline。",
+      "tasks": [
+        {
+          "id": "8.1",
+          "description": "升级 diffusion/critic dataset loaders 到新 schema。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "7.4"
+          ],
+          "details": [
+            "兼容旧 phase10 schema 和新 standalone candidate schema。",
+            "训练 condition 使用统一 condition builder。",
+            "负样本用于 critic，不进入 diffusion 最大似然正样本训练。"
+          ]
+        },
+        {
+          "id": "8.2",
+          "description": "训练新一版 standalone diffusion 和 critic。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "8.1"
+          ],
+          "details": [
+            "checkpoint 输出到 /pub/data/caohy/levelConstrainedPlanning/checkpoints。",
+            "metadata 记录 dataset hash、model config、训练超参、best loss。",
+            "保留 phase10 checkpoint 作为对照基线。"
+          ]
+        },
+        {
+          "id": "8.3",
+          "description": "建立模型 seed 经 cuRobo repair 的真实评估。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "8.2",
+            "6.4"
+          ],
+          "details": [
+            "评估 rule-only、diffusion-only、diffusion+critic、mixed+fallback。",
+            "指标以 fixed budget 下 final success@K 为主。",
+            "同时记录 alignment failure、collision failure、joint limit failure、fallback recovery rate、P50/P95 latency。"
+          ]
+        },
+        {
+          "id": "8.4",
+          "description": "更新 artifact pointer 和训练报告。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "8.3"
+          ],
+          "details": [
+            "生成 artifacts/current_artifacts.json 新版本。",
+            "新增 docs/reports/<run_name>_training_report.md。",
+            "保留旧 phase10 pointer，便于回滚。"
+          ]
+        }
+      ],
+      "deliverables": [
+        "新 schema 训练 loader",
+        "standalone diffusion checkpoint",
+        "standalone critic checkpoint",
+        "fixed-budget model evaluation report",
+        "updated artifact pointer"
+      ],
+      "exit_criteria": [
+        "模型评估不再只停留在 offline precheck。",
+        "至少一份报告比较 rule-only 与 learned+fallback 的最终成功率。",
+        "artifact pointer 能驱动 runtime 使用新模型。"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "闭环系统验收与发布冻结",
+      "priority": "P1",
+      "status": "not_started",
+      "completed": false,
+      "objective": "冻结第一版真正闭环系统基线，确保仓库可复现、数据可追踪、模型可回滚、在线失败可回退。",
+      "tasks": [
+        {
+          "id": "9.1",
+          "description": "扩展 headless smoke 为 closed-loop smoke。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "8.4"
+          ],
+          "details": [
+            "覆盖 rule-only、diffusion-shadow、diffusion-candidate、mixed-fallback。",
+            "验证 dataset export、schema validation、model sample、critic score、fallback trace。",
+            "默认不启动 RViz，不依赖显示器。"
+          ]
+        },
+        {
+          "id": "9.2",
+          "description": "建立 release checklist。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "9.1"
+          ],
+          "details": [
+            "检查仓库内无大型数据/checkpoint。",
+            "检查 current_artifacts.json 指向文件存在。",
+            "检查 docs/guides/project_mainline.md 与实际实现一致。",
+            "检查 CLI、Python API、ROS adapter 不绕过 core。"
+          ]
+        },
+        {
+          "id": "9.3",
+          "description": "打闭环系统基线 tag。",
+          "status": "not_started",
+          "completed": false,
+          "depends_on": [
+            "9.2"
+          ],
+          "details": [
+            "提交全部实现、文档、报告和 pointer。",
+            "打 tag v0.2.0-closed-loop-baseline。",
+            "release summary 记录数据集版本、模型版本、benchmark 指标和已知限制。"
+          ]
+        }
+      ],
+      "deliverables": [
+        "closed-loop smoke matrix",
+        "release summary",
+        "v0.2.0-closed-loop-baseline tag"
+      ],
+      "exit_criteria": [
+        "learned seed 能真实进入 repair/validation 链路。",
+        "learned 失败能回退 rule seed 并记录数据。",
+        "在线运行结果能导出为下一轮训练数据。",
+        "固定预算 benchmark 有 rule-only 与 learned+fallback 对照。"
+      ]
+    }
+  ],
+  "global_validation_commands": [
+    "python -m compileall level_planner_core level_planner tools tests",
+    "python tools/check_assets.py --config configs/sr5_level.yaml",
+    "python tools/check_artifacts.py --strict",
+    "python scripts/headless_smoke.py",
+    "python tools/dataset/validate_candidate_dataset.py --samples <dataset_jsonl>"
+  ],
+  "version_control_policy": [
+    "每完成一个 phase，应更新本计划中对应 status、completed、actual_outputs、verification 字段。",
+    "每完成一个 phase，应单独 git commit。",
+    "涉及大数据或 checkpoint 时，只提交 pointer、manifest 和 report，不提交大文件。",
+    "实现阶段如果发现计划不符合 CuRobo V2 API 事实，应先更新 feasibility gate 结论，再调整后续 phase。"
+  ],
+  "data_storage_policy": {
+    "public_root": "/pub/data/caohy/levelConstrainedPlanning",
+    "datasets": "/pub/data/caohy/levelConstrainedPlanning/datasets",
+    "checkpoints": "/pub/data/caohy/levelConstrainedPlanning/checkpoints",
+    "reports": "/pub/data/caohy/levelConstrainedPlanning/reports",
+    "repo_policy": "仓库只保存小型配置、文档、schema、manifest pointer、smoke reports 和代码。"
+  }
+}
