@@ -6,6 +6,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -15,8 +16,10 @@ import yaml
 
 from . import constraints
 from .result_schema import (
+    CandidateRecord,
     PlannerArtifacts,
     PlannerResult,
+    PlannerRunRecord,
     STATUS_FAILED_ALIGNMENT,
     STATUS_FAILED_INTERNAL,
     STATUS_FAILED_PLANNER,
@@ -161,6 +164,7 @@ class LevelConstrainedPlanner:
     def plan(self, request: dict[str, Any], out_dir: str | Path | None = None) -> dict[str, Any]:
         t0 = time.time()
         request_id = str(request.get("request_id") or f"request_{int(t0)}")
+        normalized: dict[str, Any] | None = None
         try:
             normalized = self._normalize_request(request)
             seed_reports = self._run_seed_providers(normalized)
@@ -198,6 +202,12 @@ class LevelConstrainedPlanner:
                 metrics=self._base_metrics(t0),
             )
 
+        self._finalize_closed_loop_records(
+            result=result,
+            original_request=request if isinstance(request, dict) else {},
+            normalized_request=normalized,
+            started_at=t0,
+        )
         if out_dir is not None:
             self._write_artifacts(result, out_dir)
         return result.to_dict()
@@ -424,6 +434,27 @@ class LevelConstrainedPlanner:
                 "selected": idx == selected_index,
             }
         status = STATUS_SUCCESS if selection["planning_status"] == "success" else STATUS_FAILED_ALIGNMENT
+        selected_candidate_id = None
+        if 0 <= selected_index < len(successful_summaries):
+            selected_candidate_id = str(successful_summaries[selected_index].get("candidate_id"))
+        candidate_records: list[dict[str, Any]] = []
+        success_index = 0
+        for item in candidate_summaries:
+            trajectory_tensor = None
+            if item.get("status") == "success" and success_index < int(positions.shape[0]):
+                trajectory_tensor = positions[success_index]
+                success_index += 1
+            candidate_records.append(
+                self._build_candidate_record_from_summary(
+                    item,
+                    request_id=request_id,
+                    run_id=request_id,
+                    trajectory=trajectory_tensor,
+                    final_status=status,
+                    final_failure_reason=selection.get("failure_reason"),
+                    alignment_tolerance_deg=float(alignment["tolerance_deg"]),
+                )
+            )
         return PlannerResult(
             request_id=request_id,
             status=status,
@@ -431,6 +462,7 @@ class LevelConstrainedPlanner:
             selected_trajectory=trajectory if status == STATUS_SUCCESS else None,
             metrics={
                 **self._base_metrics(started_at),
+                "selected_candidate_id": selected_candidate_id,
                 "alignment": {
                     "tolerance_deg": float(alignment["tolerance_deg"]),
                     "selected_max_alignment_deviation_deg": selection.get(
@@ -455,6 +487,7 @@ class LevelConstrainedPlanner:
             },
             seed_provider_reports=seed_reports,
             candidates=candidate_summaries,
+            candidate_records=candidate_records,
         )
 
     def _constraint_eval_kinematics_fn(self, positions: torch.Tensor):
@@ -496,6 +529,213 @@ class LevelConstrainedPlanner:
             "continuity": {},
             "joint_limit": {},
         }
+
+    def _finalize_closed_loop_records(
+        self,
+        *,
+        result: PlannerResult,
+        original_request: dict[str, Any],
+        normalized_request: dict[str, Any] | None,
+        started_at: float,
+    ) -> None:
+        run_id = result.request_id
+        alignment_tolerance = float(
+            (normalized_request or {}).get("alignment", {}).get(
+                "tolerance_deg", self.config.level_tolerance_deg
+            )
+        )
+        if not result.candidate_records:
+            result.candidate_records = [
+                self._build_candidate_record_from_summary(
+                    item,
+                    request_id=result.request_id,
+                    run_id=run_id,
+                    trajectory=None,
+                    final_status=result.status,
+                    final_failure_reason=result.failure_reason,
+                    alignment_tolerance_deg=alignment_tolerance,
+                )
+                for item in result.candidates
+            ]
+
+        selected_candidate_id = result.metrics.get("selected_candidate_id")
+        if not selected_candidate_id:
+            for candidate in result.candidate_records:
+                if candidate.get("lifecycle", {}).get("selected"):
+                    selected_candidate_id = candidate.get("candidate_id")
+                    result.metrics["selected_candidate_id"] = selected_candidate_id
+                    break
+
+        fallback_trace = self._build_fallback_trace(result)
+        result.planner_run_record = PlannerRunRecord(
+            run_id=run_id,
+            request_id=result.request_id,
+            created_at=datetime.fromtimestamp(started_at, timezone.utc).isoformat(),
+            robot_profile=str((normalized_request or original_request).get("robot_profile", self.config.robot_profile)),
+            request=dict(original_request),
+            normalized_request=dict(normalized_request or {}),
+            world_summary=dict(self._world_summary),
+            seed_policy=dict((normalized_request or {}).get("seed_policy") or {}),
+            seed_provider_reports=list(result.seed_provider_reports),
+            candidates=list(result.candidate_records),
+            fallback_trace=fallback_trace,
+            result_status=result.status,
+            failure_reason=result.failure_reason,
+            selected_candidate_id=selected_candidate_id,
+            metrics=dict(result.metrics),
+            timings={"total_solve_time_sec": result.metrics.get("solve_time_sec")},
+            artifacts=result.artifacts.to_dict(),
+            environment={
+                "device": self.device,
+                "joint_names": list(self._joint_names),
+                "tool_frames": list(self._tool_frames),
+            },
+        ).to_dict()
+
+    def _build_fallback_trace(self, result: PlannerResult) -> list[dict[str, Any]]:
+        trace: list[dict[str, Any]] = []
+        for index, report in enumerate(result.seed_provider_reports):
+            trace.append(
+                {
+                    "stage_index": index,
+                    "stage": "seed_provider",
+                    "provider": report.get("provider") or report.get("provider_name"),
+                    "mode": report.get("mode"),
+                    "status": report.get("status"),
+                    "generated_count": report.get("generated_count", 0),
+                    "accepted_count": report.get("accepted_count", 0),
+                    "runtime_effect": report.get("runtime_effect"),
+                }
+            )
+        selected_candidate_id = result.metrics.get("selected_candidate_id")
+        trace.append(
+            {
+                "stage_index": len(trace),
+                "stage": "selection",
+                "status": result.status,
+                "selected_candidate_id": selected_candidate_id,
+                "failure_reason": result.failure_reason,
+            }
+        )
+        return trace
+
+    def _build_candidate_record_from_summary(
+        self,
+        summary: dict[str, Any],
+        *,
+        request_id: str,
+        run_id: str,
+        trajectory: torch.Tensor | None,
+        final_status: str,
+        final_failure_reason: str | None,
+        alignment_tolerance_deg: float,
+    ) -> dict[str, Any]:
+        candidate_id = str(summary.get("candidate_id") or f"candidate_{len(summary)}")
+        source_type = self._normalize_source_type(summary.get("source_type") or summary.get("source_label"))
+        source_label = str(summary.get("source_label") or source_type)
+        status = str(summary.get("status") or "unknown")
+        metrics = dict(summary.get("metrics") or {})
+        selected = bool(metrics.get("selected") or summary.get("selected"))
+        optimizer_success = status == "success"
+        max_alignment = metrics.get("max_alignment_deviation_deg")
+        alignment_valid = True
+        if max_alignment is not None:
+            try:
+                alignment_valid = float(max_alignment) <= float(alignment_tolerance_deg)
+            except Exception:
+                alignment_valid = False
+        validator_valid = bool(optimizer_success and alignment_valid)
+        failure_stage = None
+        failure_reason = summary.get("failure_reason") or None
+        if not optimizer_success:
+            failure_stage = "repair"
+            failure_reason = failure_reason or status
+        elif not validator_valid:
+            failure_stage = "validation"
+            failure_reason = final_failure_reason or "failed_alignment_constraint"
+        trajectory_points = self._trajectory_tensor_to_list(trajectory) if trajectory is not None else []
+        trajectory_shape = [
+            len(trajectory_points),
+            len(trajectory_points[0]) if trajectory_points else 0,
+        ]
+        validator_metrics = {
+            "status": "valid" if validator_valid else "failed",
+            "valid": validator_valid,
+            "alignment_tolerance_deg": float(alignment_tolerance_deg),
+            "max_alignment_deviation_deg": max_alignment,
+            "failure_reason": None if validator_valid else failure_reason,
+            "metrics": metrics,
+        }
+        positive_for_critic = bool(validator_valid and selected and final_status == STATUS_SUCCESS)
+        labels = {
+            "planner_status": final_status,
+            "candidate_status": status,
+            "failure_reason": failure_reason,
+            "selected": selected,
+            "validator_valid": validator_valid,
+            "positive_for_diffusion": bool(validator_valid),
+            "positive_for_critic": positive_for_critic,
+            "negative_for_critic": not positive_for_critic,
+            "fallback_recovered": False,
+        }
+        return CandidateRecord(
+            candidate_id=candidate_id,
+            run_id=run_id,
+            request_id=request_id,
+            source_lineage={
+                "source_type": source_type,
+                "source_label": source_label,
+                "provider": "planner_native" if source_type == "planner_native" else source_type,
+                "provider_mode": "native",
+            },
+            trajectory={
+                "format": "joint_position_rad",
+                "shape": trajectory_shape,
+                "points": trajectory_points,
+            },
+            lifecycle={
+                "generated": True,
+                "precheck_passed": status != STATUS_FAILED_PRECHECK,
+                "entered_pool": bool(summary.get("entered_pool", True)),
+                "repair_attempted": True,
+                "repair_success": optimizer_success,
+                "hard_validation_attempted": optimizer_success,
+                "hard_validation_passed": validator_valid,
+                "selected": selected,
+                "fallback_recovered": False,
+            },
+            precheck=dict(summary.get("precheck") or {}),
+            optimizer_result={
+                "status": status,
+                "success": optimizer_success,
+                "result_status": summary.get("result_status"),
+                "solve_time_sec": summary.get("solve_time_sec"),
+                "trajectory_shape": summary.get("trajectory_shape") or trajectory_shape,
+                "failure_reason": summary.get("failure_reason"),
+            },
+            validator_metrics=validator_metrics,
+            labels=labels,
+            failure_stage=failure_stage,
+            failure_reason=failure_reason,
+            metrics=metrics,
+        ).to_dict()
+
+    @staticmethod
+    def _normalize_source_type(source_type: Any) -> str:
+        raw = str(source_type or "unknown")
+        if raw == "planner":
+            return "planner_native"
+        if raw in {"rule", "rule_seed"}:
+            return "rule_seed"
+        if raw == "rule_raw":
+            return "rule_raw_seed"
+        if raw in {"diffusion", "diffusion_seed"}:
+            return "diffusion_seed"
+        if raw in {"critic", "critic_selected"}:
+            return "critic_selected"
+        if raw in {"fallback", "fallback_rule_seed"}:
+            return "fallback_rule_seed"
+        return raw
 
     @staticmethod
     def _flatten_position_tensor(position_tensor) -> torch.Tensor:
@@ -564,13 +804,19 @@ class LevelConstrainedPlanner:
         result_path = out_path / "result.json"
         selected_path = out_path / "selected_trajectory.json"
         candidates_path = out_path / "candidate_summary.json"
+        candidates_jsonl_path = out_path / "candidates.jsonl"
         lifecycle_path = out_path / "lifecycle.json"
+        planner_run_path = out_path / "planner_run.json"
         result.artifacts = PlannerArtifacts(
             result_json=str(result_path),
             selected_trajectory_json=str(selected_path),
             candidate_summary_json=str(candidates_path),
+            candidates_jsonl=str(candidates_jsonl_path),
             lifecycle_json=str(lifecycle_path),
+            planner_run_json=str(planner_run_path),
         )
+        if result.planner_run_record:
+            result.planner_run_record["artifacts"] = result.artifacts.to_dict()
         selected_path.write_text(
             json.dumps(
                 {
@@ -588,19 +834,29 @@ class LevelConstrainedPlanner:
             json.dumps(result.candidates, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
+        with candidates_jsonl_path.open("w", encoding="utf-8") as handle:
+            for candidate in result.candidate_records:
+                handle.write(json.dumps(candidate, ensure_ascii=False) + "\n")
         lifecycle_path.write_text(
             json.dumps(
                 {
                     "request_id": result.request_id,
                     "status": result.status,
+                    "planner_run_record": result.planner_run_record,
                     "seed_provider_reports": result.seed_provider_reports,
                     "candidates": result.candidates,
+                    "candidate_records_path": str(candidates_jsonl_path),
+                    "fallback_trace": result.planner_run_record.get("fallback_trace", []),
                     "metrics": result.metrics,
                 },
                 ensure_ascii=False,
                 indent=2,
             )
             + "\n",
+            encoding="utf-8",
+        )
+        planner_run_path.write_text(
+            json.dumps(result.planner_run_record, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
         result_path.write_text(

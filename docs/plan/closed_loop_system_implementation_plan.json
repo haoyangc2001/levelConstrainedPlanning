@@ -208,15 +208,15 @@
       "id": 1,
       "name": "闭环数据记录与导出基础设施",
       "priority": "P0",
-      "status": "not_started",
-      "completed": false,
+      "status": "completed",
+      "completed": true,
       "objective": "让每次 planner run 都能生成可回流、可训练、可审计的候选级数据，而不是只导出最终 selected trajectory。",
       "tasks": [
         {
           "id": "1.1",
           "description": "在 result_schema 中新增候选级和运行级结构。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "0.1"
           ],
@@ -229,8 +229,8 @@
         {
           "id": "1.2",
           "description": "扩展 _write_artifacts，落盘完整 candidate 和 lifecycle 数据。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "1.1"
           ],
@@ -243,8 +243,8 @@
         {
           "id": "1.3",
           "description": "重写 export_core_results_dataset.py 为 candidate dataset exporter。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "1.2"
           ],
@@ -258,8 +258,8 @@
         {
           "id": "1.4",
           "description": "补充 schema validator 和小样本回归测试。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "1.3"
           ],
@@ -280,6 +280,23 @@
         "一次 headless run 能导出 candidate JSONL。",
         "导出 JSONL 同时包含成功和失败候选。",
         "learning dataset loader 可以读取 standalone 导出的样本。"
+      ],
+      "actual_outputs": [
+        "level_planner_core/result_schema.py 新增 CandidateRecord 和 PlannerRunRecord。",
+        "level_planner_core/planner.py 写出 candidates.jsonl、planner_run.json 和增强 lifecycle.json。",
+        "tools/dataset/export_core_results_dataset.py 升级为 candidate-level dataset exporter，并输出 manifest。",
+        "tools/dataset/validate_candidate_dataset.py 新增候选数据集 schema validator。",
+        "tests/fixtures/candidate_dataset_smoke.jsonl 和 tests/test_candidate_dataset.py 覆盖 success、failed_alignment、failed_planner、diffusion_shadow。",
+        "runs/phase1_candidate_dataset_smoke/candidate_samples.jsonl",
+        "runs/phase1_candidate_dataset_smoke/manifest.json",
+        "runs/phase1_candidate_dataset_smoke/validation_report.json"
+      ],
+      "verification": [
+        "python3 -m compileall level_planner_core level_planner tools tests",
+        "python3 tools/dataset/validate_candidate_dataset.py --samples tests/fixtures/candidate_dataset_smoke.jsonl --require-positive --require-negative",
+        "PYTHONPATH=$PWD PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q tests/test_candidate_dataset.py tests/test_import_smoke.py tests/test_constraints_smoke.py",
+        "实际 headless planner smoke 写出 3 个 run artifact，导出 5 条 candidate 样本，其中 positive_for_diffusion=1、negative_for_critic=4。",
+        "TrajectorySeedDataset 与 SuccessCriticDataset 均可读取 runs/phase1_candidate_dataset_smoke/candidate_samples.jsonl。"
       ]
     },
     {
