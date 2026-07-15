@@ -21,3 +21,5 @@ planner:
   rule_seed_bridge_radius: 2
   diffusion_generated_samples_path: /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_mature_diffusion_20260715_generated_samples.json
   diffusion_checkpoint_path: /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt
+  critic_checkpoint_path: /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/best.pt
+  learned_seed_use_critic: true

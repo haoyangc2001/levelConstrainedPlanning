@@ -11,7 +11,11 @@ from typing import Any
 import torch
 from torch.utils.data import Dataset
 
-from artifact_paths import artifact_path
+try:
+    from artifact_paths import artifact_path
+except ImportError:
+    from .artifact_paths import artifact_path
+from level_planner_core.condition import build_condition_tensor
 
 
 DEFAULT_VALIDATED_SAMPLES = artifact_path("dataset", "training_dataset")
@@ -52,17 +56,7 @@ def resample_trajectory(points: list[list[float]], horizon: int) -> torch.Tensor
 
 
 def build_condition(sample: dict[str, Any]) -> torch.Tensor:
-    start = sample.get("start_state", {}).get("service_start_joint") or [0.0] * 6
-    task = sample.get("task", {})
-    target_pose = task.get("target_pose") or [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
-    tolerance = task.get("alignment", {}).get("tolerance_deg") or 3.0
-    obstacle_count = sample.get("obstacle_world", {}).get("total_box_count") or 0
-    return torch.tensor(
-        [float(v) for v in start]
-        + [float(v) for v in target_pose]
-        + [float(tolerance), float(obstacle_count)],
-        dtype=torch.float32,
-    )
+    return build_condition_tensor(sample)
 
 
 @dataclass

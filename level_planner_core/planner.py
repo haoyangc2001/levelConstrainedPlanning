@@ -26,12 +26,11 @@ from .result_schema import (
     STATUS_FAILED_PRECHECK,
     STATUS_SUCCESS,
 )
+from .learned_seed import CheckpointDiffusionSeedProvider, CheckpointDiffusionSeedProviderConfig
 from .repair import SeedRepairAdapter
 from .robot_assets import resolve_robot_config
 from .rule_seed import RuleLevelSeedProvider, RuleSeedProviderConfig
 from .seed_provider import (
-    DiffusionSeedProviderConfig,
-    FileDiffusionSeedProvider,
     NullDiffusionSeedProvider,
 )
 from .world import build_world
@@ -76,6 +75,11 @@ class LevelPlannerConfig:
         "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/"
         "sr5_phase10_mature_diffusion_20260715/best.pt"
     )
+    critic_checkpoint_path: str = (
+        "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/"
+        "sr5_phase10_success_critic_20260715/best.pt"
+    )
+    learned_seed_use_critic: bool = True
 
     @classmethod
     def from_file(cls, path: str | Path) -> "LevelPlannerConfig":
@@ -121,6 +125,8 @@ class LevelPlannerConfig:
             "rule_seed_bridge_radius",
             "diffusion_generated_samples_path",
             "diffusion_checkpoint_path",
+            "critic_checkpoint_path",
+            "learned_seed_use_critic",
         ):
             if key in planner_cfg:
                 setattr(cfg, key, planner_cfg[key])
@@ -358,14 +364,16 @@ class LevelConstrainedPlanner:
         elif mode == "shadow":
             diffusion_mode = "shadow"
         provider = (
-            FileDiffusionSeedProvider(
-                DiffusionSeedProviderConfig(
+            CheckpointDiffusionSeedProvider(
+                CheckpointDiffusionSeedProviderConfig(
                     mode=diffusion_mode,
-                    generated_samples_path=self.config.diffusion_generated_samples_path,
+                    diffusion_checkpoint_path=self.config.diffusion_checkpoint_path,
+                    critic_checkpoint_path=self.config.critic_checkpoint_path,
                     k_generate=int(policy.get("k_generate") or 0),
                     k_accept=int(policy.get("k_accept") or 0),
-                    model_timeout_sec=float(policy.get("timeout_sec") or 0.2),
-                    fallback_to_rule_seed=bool(policy.get("fallback_to_rule_seed", True)),
+                    timeout_sec=float(policy.get("timeout_sec") or 2.0),
+                    device=self.device,
+                    use_critic=bool(self.config.learned_seed_use_critic),
                 )
             )
             if diffusion_mode != "off"
@@ -378,6 +386,8 @@ class LevelConstrainedPlanner:
                 "dof": len(self._joint_names),
                 "joint_names": list(self._joint_names),
                 "tool_frames": list(self._tool_frames),
+                "alignment": request["alignment"],
+                "world_summary": dict(self._world_summary),
             }
         )
         provider_report = provider_result.to_lifecycle_dict()

@@ -13,7 +13,10 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset
 
-from dataset import DEFAULT_VALIDATED_SAMPLES, build_condition, resample_trajectory
+try:
+    from dataset import DEFAULT_VALIDATED_SAMPLES, build_condition, resample_trajectory
+except ImportError:
+    from .dataset import DEFAULT_VALIDATED_SAMPLES, build_condition, resample_trajectory
 
 
 CRITIC_OUTPUT_KEYS = [
