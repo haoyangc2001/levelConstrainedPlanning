@@ -203,31 +203,12 @@ class LevelConstrainedPlanner:
         try:
             normalized = self._normalize_request(request)
             seed_reports = self._run_seed_providers(normalized)
-            external_candidates, external_attempts = self._collect_external_seed_candidates(
-                normalized,
-                seed_reports,
+            result = self._plan_with_control_flow(
+                request_id=request_id,
+                request=normalized,
+                seed_reports=seed_reports,
+                started_at=t0,
             )
-            native_candidates, native_attempts = self._collect_planner_candidates(normalized)
-            candidates = external_candidates + native_candidates
-            planner_attempts = external_attempts + native_attempts
-            if not candidates:
-                result = PlannerResult(
-                    request_id=request_id,
-                    status=STATUS_FAILED_PLANNER,
-                    failure_reason="curobo_plan_pose_returned_no_successful_candidate",
-                    metrics=self._base_metrics(t0),
-                    seed_provider_reports=seed_reports,
-                    candidates=planner_attempts,
-                )
-            else:
-                result = self._select_candidate(
-                    request_id=request_id,
-                    request=normalized,
-                    candidates=candidates,
-                    candidate_summaries=planner_attempts,
-                    seed_reports=seed_reports,
-                    started_at=t0,
-                )
         except ValueError as exc:
             result = PlannerResult(
                 request_id=request_id,
@@ -252,6 +233,176 @@ class LevelConstrainedPlanner:
         if out_dir is not None:
             self._write_artifacts(result, out_dir)
         return result.to_dict()
+
+    def _plan_with_control_flow(
+        self,
+        *,
+        request_id: str,
+        request: dict[str, Any],
+        seed_reports: list[dict[str, Any]],
+        started_at: float,
+    ) -> PlannerResult:
+        external_candidates, external_summaries = self._collect_external_seed_candidates(
+            request,
+            seed_reports,
+        )
+        learned_candidates, learned_summaries = self._filter_candidate_group(
+            external_candidates,
+            external_summaries,
+            {"diffusion_seed"},
+        )
+        rule_candidates, rule_summaries = self._filter_candidate_group(
+            external_candidates,
+            external_summaries,
+            {"rule_seed"},
+        )
+        all_summaries: list[dict[str, Any]] = list(external_summaries)
+        trace: list[dict[str, Any]] = []
+        mode = str(request.get("seed_policy", {}).get("mode") or "rule")
+        fallback_to_rule = bool(request.get("seed_policy", {}).get("fallback_to_rule_seed", True))
+        total_budget_ms = float(request.get("metadata", {}).get("total_budget_ms") or 0.0)
+        learned_modes = {"diffusion", "mixed", "candidate"}
+
+        if mode in learned_modes:
+            learned_result = self._select_branch_or_fail(
+                branch_name="learned",
+                request_id=request_id,
+                request=request,
+                candidates=learned_candidates,
+                candidate_summaries=learned_summaries,
+                seed_reports=seed_reports,
+                started_at=started_at,
+            )
+            trace.append(self._branch_trace_record("learned", learned_result, started_at, total_budget_ms))
+            if learned_result.status == STATUS_SUCCESS:
+                learned_result.candidates = all_summaries
+                learned_result.metrics["success_source"] = "learned"
+                learned_result.metrics["control_flow_trace"] = trace
+                return learned_result
+
+            if fallback_to_rule:
+                rule_result = self._select_branch_or_fail(
+                    branch_name="rule_fallback",
+                    request_id=request_id,
+                    request=request,
+                    candidates=rule_candidates,
+                    candidate_summaries=rule_summaries,
+                    seed_reports=seed_reports,
+                    started_at=started_at,
+                )
+                trace.append(self._branch_trace_record("rule_fallback", rule_result, started_at, total_budget_ms))
+                if rule_result.status == STATUS_SUCCESS:
+                    rule_result.candidates = all_summaries
+                    rule_result.metrics["success_source"] = "rule_fallback"
+                    rule_result.metrics["control_flow_trace"] = trace
+                    return rule_result
+
+        elif mode == "rule" and rule_candidates:
+            rule_result = self._select_branch_or_fail(
+                branch_name="rule",
+                request_id=request_id,
+                request=request,
+                candidates=rule_candidates,
+                candidate_summaries=rule_summaries,
+                seed_reports=seed_reports,
+                started_at=started_at,
+            )
+            trace.append(self._branch_trace_record("rule", rule_result, started_at, total_budget_ms))
+            if rule_result.status == STATUS_SUCCESS:
+                rule_result.candidates = all_summaries
+                rule_result.metrics["success_source"] = "rule"
+                rule_result.metrics["control_flow_trace"] = trace
+                return rule_result
+
+        native_candidates, native_summaries = self._collect_planner_candidates(request)
+        all_summaries.extend(native_summaries)
+        native_result = self._select_branch_or_fail(
+            branch_name="planner_native",
+            request_id=request_id,
+            request=request,
+            candidates=native_candidates,
+            candidate_summaries=native_summaries,
+            seed_reports=seed_reports,
+            started_at=started_at,
+        )
+        trace.append(self._branch_trace_record("planner_native", native_result, started_at, total_budget_ms))
+        native_result.candidates = all_summaries
+        native_result.metrics["success_source"] = "planner_native" if native_result.status == STATUS_SUCCESS else None
+        native_result.metrics["control_flow_trace"] = trace
+        if native_result.status != STATUS_SUCCESS and mode in learned_modes:
+            native_result.failure_reason = native_result.failure_reason or "failed_all_fallbacks"
+            native_result.status = "failed_all_fallbacks"
+        return native_result
+
+    def _select_branch_or_fail(
+        self,
+        *,
+        branch_name: str,
+        request_id: str,
+        request: dict[str, Any],
+        candidates: list[torch.Tensor],
+        candidate_summaries: list[dict[str, Any]],
+        seed_reports: list[dict[str, Any]],
+        started_at: float,
+    ) -> PlannerResult:
+        if not candidates:
+            return PlannerResult(
+                request_id=request_id,
+                status=STATUS_FAILED_PLANNER,
+                failure_reason=f"{branch_name}_returned_no_successful_candidate",
+                metrics=self._base_metrics(started_at),
+                seed_provider_reports=seed_reports,
+                candidates=candidate_summaries,
+            )
+        result = self._select_candidate(
+            request_id=request_id,
+            request=request,
+            candidates=candidates,
+            candidate_summaries=candidate_summaries,
+            seed_reports=seed_reports,
+            started_at=started_at,
+        )
+        result.metrics["branch_name"] = branch_name
+        return result
+
+    @staticmethod
+    def _filter_candidate_group(
+        candidates: list[torch.Tensor],
+        summaries: list[dict[str, Any]],
+        source_types: set[str],
+    ) -> tuple[list[torch.Tensor], list[dict[str, Any]]]:
+        selected_candidates: list[torch.Tensor] = []
+        selected_summaries: list[dict[str, Any]] = []
+        success_index = 0
+        for summary in summaries:
+            trajectory = None
+            if summary.get("status") == "success" and success_index < len(candidates):
+                trajectory = candidates[success_index]
+                success_index += 1
+            if summary.get("source_type") in source_types:
+                selected_summaries.append(summary)
+                if trajectory is not None:
+                    selected_candidates.append(trajectory)
+        return selected_candidates, selected_summaries
+
+    @staticmethod
+    def _branch_trace_record(
+        branch_name: str,
+        result: PlannerResult,
+        started_at: float,
+        total_budget_ms: float,
+    ) -> dict[str, Any]:
+        elapsed_ms = round((time.time() - started_at) * 1000.0, 3)
+        return {
+            "stage": branch_name,
+            "status": result.status,
+            "failure_reason": result.failure_reason,
+            "candidate_count": len(result.candidates),
+            "selected_candidate_id": result.metrics.get("selected_candidate_id"),
+            "elapsed_ms": elapsed_ms,
+            "total_budget_ms": total_budget_ms or None,
+            "timeout": bool(total_budget_ms and elapsed_ms > total_budget_ms),
+        }
 
     def _normalize_request(self, request: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(request, dict):
@@ -804,6 +955,23 @@ class LevelConstrainedPlanner:
                 )
                 for item in result.candidates
             ]
+        existing_candidate_record_ids = {str(item.get("candidate_id")) for item in result.candidate_records}
+        for item in result.candidates:
+            candidate_id = str(item.get("candidate_id") or "")
+            if candidate_id and candidate_id not in existing_candidate_record_ids:
+                result.candidate_records.append(
+                    self._build_candidate_record_from_summary(
+                        item,
+                        request_id=result.request_id,
+                        run_id=run_id,
+                        trajectory=None,
+                        final_status=result.status,
+                        final_failure_reason=result.failure_reason,
+                        alignment_tolerance_deg=alignment_tolerance,
+                        start_joint=start_joint,
+                    )
+                )
+                existing_candidate_record_ids.add(candidate_id)
         self._append_provider_candidate_records(
             result=result,
             run_id=run_id,
@@ -861,6 +1029,14 @@ class LevelConstrainedPlanner:
                 }
             )
         selected_candidate_id = result.metrics.get("selected_candidate_id")
+        for record in result.metrics.get("control_flow_trace") or []:
+            trace.append(
+                {
+                    "stage_index": len(trace),
+                    "stage": "control_flow",
+                    **dict(record),
+                }
+            )
         trace.append(
             {
                 "stage_index": len(trace),

@@ -42,6 +42,8 @@ def main(argv: list[str] | None = None) -> int:
             "request_id": result.get("request_id"),
             "status": result.get("status"),
             "failure_reason": result.get("failure_reason"),
+            "success_source": result.get("metrics", {}).get("success_source"),
+            "selected_candidate_id": result.get("metrics", {}).get("selected_candidate_id"),
             "result_json": result.get("artifacts", {}).get("result_json"),
         }, ensure_ascii=False))
         return 0 if result.get("status") == "success" else 2
