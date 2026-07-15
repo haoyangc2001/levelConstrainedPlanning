@@ -39,17 +39,23 @@ def build_report(pointer: Path, strict: bool = False) -> dict[str, Any]:
         })
     ok = all(item["exists"] for item in checks if item["required"]) if strict else True
     missing = [item for item in checks if item["required"] and not item["exists"]]
+    dataset_path = artifacts.get("dataset", {}).get("training_dataset", {}).get("path")
+    public_data_root = None
+    if dataset_path:
+        dataset_file = Path(dataset_path)
+        if len(dataset_file.parents) >= 3:
+            public_data_root = str(dataset_file.parents[2])
     return {
         "schema_version": "standalone_level_planning.artifact_check.v1",
         "ok": ok,
         "strict": bool(strict),
         "pointer": str(pointer),
-        "public_data_root": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning",
+        "public_data_root": public_data_root,
         "missing_required": missing,
         "checks": checks,
         "sync_hint": (
-            "If required files are missing, sync the phase10 dataset/checkpoints/reports "
-            "to /pub/data/caohy/tashan_Manipulation/diffusionSeedLearning and rerun this check."
+            "If required files are missing, sync the dataset/checkpoint files recorded in "
+            "artifacts/current_artifacts.json and rerun this check."
         ),
     }
 
@@ -71,4 +77,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

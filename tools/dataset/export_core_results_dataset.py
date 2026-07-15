@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
+import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +39,18 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _git_commit() -> str | None:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parents[2],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        return None
 
 
 def _iter_result_files(inputs: list[Path]) -> list[Path]:
@@ -239,14 +253,47 @@ def _write_manifest(
         str(sample.get("labels", {}).get("candidate_status") or "unknown")
         for sample in samples
     )
+    failure_counter = Counter(
+        str(
+            sample.get("labels", {}).get("failure_reason")
+            or sample.get("candidate", {}).get("failure_reason")
+            or "none"
+        )
+        for sample in samples
+    )
+    request_ids = {
+        str(sample.get("source", {}).get("planner_run_json") or sample.get("source", {}).get("result_json"))
+        for sample in samples
+    }
+    difficulty_counter = Counter(
+        str(
+            (
+                (
+                    _read_json(Path(sample.get("source", {}).get("planner_run_json")))
+                    if sample.get("source", {}).get("planner_run_json")
+                    and Path(sample.get("source", {}).get("planner_run_json")).exists()
+                    else {}
+                ).get("request", {})
+                .get("metadata", {})
+                .get("sampling", {})
+                .get("difficulty_bucket")
+            )
+            or "unknown"
+        )
+        for sample in samples
+    )
     manifest = {
         "schema_version": "standalone_candidate_dataset_manifest.v1",
         "dataset_name": dataset_name,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "git_commit": _git_commit(),
         "samples_path": str(out),
         "samples_sha256": _sha256(out) if out.exists() else None,
+        "generation_command": sys.argv,
         "result_file_count": len(result_files),
+        "request_count": len(request_ids),
         "sample_count": len(samples),
+        "candidate_count": len(samples),
         "candidate_with_points_count": sum(
             1 for sample in samples if sample.get("candidate", {}).get("trajectory", {}).get("points")
         ),
@@ -261,6 +308,8 @@ def _write_manifest(
         ),
         "source_type_counts": dict(sorted(source_counter.items())),
         "candidate_status_counts": dict(sorted(status_counter.items())),
+        "failure_reason_counts": dict(sorted(failure_counter.items())),
+        "difficulty_bucket_counts": dict(sorted(difficulty_counter.items())),
         "input_result_files": [str(path) for path in result_files],
     }
     manifest_out.parent.mkdir(parents=True, exist_ok=True)

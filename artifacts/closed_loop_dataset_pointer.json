@@ -1,0 +1,70 @@
+{
+  "schema_version": "standalone_closed_loop_dataset_pointer.v1",
+  "status": "active",
+  "created_at": "2026-07-15T16:19:26.728859+00:00",
+  "git_commit": "88fece28dd88e905c09ec9dcff4f8f6ccde06eec",
+  "dataset": {
+    "name": "sr5_closed_loop_phase7_smoke_20260715",
+    "sample_count": 44,
+    "candidate_count": 44,
+    "request_count": 6,
+    "positive_for_diffusion": 3,
+    "positive_for_critic": 2,
+    "negative_for_critic": 42,
+    "source_type_counts": {
+      "diffusion_seed": 12,
+      "planner_native": 16,
+      "rule_raw_seed": 8,
+      "rule_seed": 8
+    },
+    "candidate_status_counts": {
+      "failed_planner": 13,
+      "raw_seed_parent_only": 16,
+      "success": 15
+    },
+    "difficulty_bucket_counts": {
+      "easy": 18,
+      "hard": 12,
+      "medium": 14
+    },
+    "obstacle_case_counts": {
+      "multi": 2,
+      "none": 2,
+      "single": 2
+    },
+    "training_dataset": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl",
+      "exists": true,
+      "size_bytes": 358989,
+      "sha256": "ef63ecaa75e50bb1b58fb81bd8ca7d3b727e34059359a071854ede98a5d1dba7"
+    },
+    "dataset_manifest": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/manifest.json",
+      "exists": true,
+      "size_bytes": 2328,
+      "sha256": "be816f0d26b92554582094a6157a6bccbd34a4a7dde28c6bc16a05e7a4b09632"
+    },
+    "validator_report": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/validator_report.json",
+      "exists": true,
+      "size_bytes": 611,
+      "sha256": "6145be49d643425e5fc6508d340eae38fb7aa741e0a68fc4d8ea8fc188488eed"
+    },
+    "batch_summary": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/batch_summary.json",
+      "exists": true,
+      "size_bytes": 5815,
+      "sha256": "c314bf093bbb649236827fa3220d4d2ec77887f1ab93aa44dbb44366f1278ac0"
+    },
+    "sampling_manifest": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/sampling_manifest.json",
+      "exists": true,
+      "size_bytes": 1405,
+      "sha256": "324eeafea3d080333d4ffb6ce741d72d4c6109925cd9a29bcfa47029290994d6"
+    }
+  },
+  "notes": [
+    "Phase 7 smoke standalone closed-loop dataset: 6 sampled requests, 44 candidates, includes success/failure/fallback lifecycle evidence."
+  ],
+  "large_file_policy": "Do not commit dataset JSONL, lifecycle run directories, or checkpoint .pt files."
+}

@@ -1,6 +1,6 @@
 {
   "schema_version": "standalone_level_planning.artifacts.v1",
-  "status": "active_pointer_only",
+  "status": "active_standalone_closed_loop_dataset",
   "created_at": "2026-07-15",
   "source_repo_root": "/home/caohy/repositories/tashan_Manipulation",
   "source_pointer": {
@@ -8,35 +8,63 @@
     "sha256": "c11fb62a2b2b5b39537b23469da0593abc197d2d4136238e3a27b24598709134"
   },
   "dataset": {
-    "name": "sr5_phase10_20260715_baseline_jitter_train",
-    "sample_count": 993,
-    "candidate_count": 833,
-    "validated_candidate_count": 833,
-    "positive_for_diffusion": 140,
-    "positive_for_critic": 140,
+    "name": "sr5_closed_loop_phase7_smoke_20260715",
+    "sample_count": 44,
+    "candidate_count": 44,
+    "request_count": 6,
+    "positive_for_diffusion": 3,
+    "positive_for_critic": 2,
+    "negative_for_critic": 42,
+    "source_type_counts": {
+      "diffusion_seed": 12,
+      "planner_native": 16,
+      "rule_raw_seed": 8,
+      "rule_seed": 8
+    },
+    "candidate_status_counts": {
+      "failed_planner": 13,
+      "raw_seed_parent_only": 16,
+      "success": 15
+    },
+    "difficulty_bucket_counts": {
+      "easy": 18,
+      "hard": 12,
+      "medium": 14
+    },
+    "obstacle_case_counts": {
+      "multi": 2,
+      "none": 2,
+      "single": 2
+    },
     "training_dataset": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/datasets/sr5_phase10_20260715_baseline_jitter_train/samples_validated.jsonl",
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl",
       "exists": true,
-      "size_bytes": 382655246,
-      "sha256": null
+      "size_bytes": 358989,
+      "sha256": "ef63ecaa75e50bb1b58fb81bd8ca7d3b727e34059359a071854ede98a5d1dba7"
     },
     "dataset_manifest": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/datasets/sr5_phase10_20260715_baseline_jitter_train/manifest.json",
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/manifest.json",
       "exists": true,
-      "size_bytes": 44418,
-      "sha256": "f6d71bd4687d26ef2c226219df5d4a78c07136fa07ac911cab4ffca786359162"
-    },
-    "dataset_summary": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_20260715_baseline_jitter_train_dataset_summary.json",
-      "exists": true,
-      "size_bytes": 1148,
-      "sha256": "7af28893b1e82e0de323365131cb2463a28c77942c4c6aaf8feaaa456cba9614"
+      "size_bytes": 2328,
+      "sha256": "be816f0d26b92554582094a6157a6bccbd34a4a7dde28c6bc16a05e7a4b09632"
     },
     "validator_report": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_20260715_baseline_jitter_train_validator_report.json",
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/validator_report.json",
       "exists": true,
-      "size_bytes": 2340,
-      "sha256": "815c21b2e3ce54557947b648936bdfc0360476d1f21843cecdf90461069a7dbb"
+      "size_bytes": 611,
+      "sha256": "6145be49d643425e5fc6508d340eae38fb7aa741e0a68fc4d8ea8fc188488eed"
+    },
+    "batch_summary": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/batch_summary.json",
+      "exists": true,
+      "size_bytes": 5815,
+      "sha256": "c314bf093bbb649236827fa3220d4d2ec77887f1ab93aa44dbb44366f1278ac0"
+    },
+    "sampling_manifest": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/sampling_manifest.json",
+      "exists": true,
+      "size_bytes": 1405,
+      "sha256": "324eeafea3d080333d4ffb6ce741d72d4c6109925cd9a29bcfa47029290994d6"
     }
   },
   "diffusion": {
@@ -108,5 +136,43 @@
     "candidate mode remains blocked for real robot unless diffusion_seed_allow_real_robot_candidate is explicitly true.",
     "The model is a trajectory seed generator; CuRobo repair and hard validation remain mandatory."
   ],
-  "large_file_policy": "Do not commit datasets, generated samples, or checkpoint .pt files into this repository."
+  "large_file_policy": "Do not commit dataset JSONL, lifecycle run directories, or checkpoint .pt files.",
+  "legacy_phase10_dataset": {
+    "name": "sr5_phase10_20260715_baseline_jitter_train",
+    "sample_count": 993,
+    "candidate_count": 833,
+    "validated_candidate_count": 833,
+    "positive_for_diffusion": 140,
+    "positive_for_critic": 140,
+    "training_dataset": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/datasets/sr5_phase10_20260715_baseline_jitter_train/samples_validated.jsonl",
+      "exists": true,
+      "size_bytes": 382655246,
+      "sha256": null
+    },
+    "dataset_manifest": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/datasets/sr5_phase10_20260715_baseline_jitter_train/manifest.json",
+      "exists": true,
+      "size_bytes": 44418,
+      "sha256": "f6d71bd4687d26ef2c226219df5d4a78c07136fa07ac911cab4ffca786359162"
+    },
+    "dataset_summary": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_20260715_baseline_jitter_train_dataset_summary.json",
+      "exists": true,
+      "size_bytes": 1148,
+      "sha256": "7af28893b1e82e0de323365131cb2463a28c77942c4c6aaf8feaaa456cba9614"
+    },
+    "validator_report": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_20260715_baseline_jitter_train_validator_report.json",
+      "exists": true,
+      "size_bytes": 2340,
+      "sha256": "815c21b2e3ce54557947b648936bdfc0360476d1f21843cecdf90461069a7dbb"
+    }
+  },
+  "updated_at": "2026-07-15T16:19:26.762160+00:00",
+  "closed_loop_dataset_pointer": {
+    "path": "artifacts/closed_loop_dataset_pointer.json",
+    "git_commit": "88fece28dd88e905c09ec9dcff4f8f6ccde06eec",
+    "dataset_name": "sr5_closed_loop_phase7_smoke_20260715"
+  }
 }
