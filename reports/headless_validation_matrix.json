@@ -16,19 +16,20 @@
         "launch"
       ],
       "returncode": 0,
-      "elapsed_sec": 0.255653,
+      "elapsed_sec": 0.467059,
       "stdout_tail": [
-        "Listing 'level_planner_core'...",
-        "Listing 'level_planner'...",
-        "Listing 'level_planner_cli'...",
-        "Listing 'level_planner_ros'...",
-        "Listing 'tools'...",
-        "Listing 'tools/dataset'...",
-        "Listing 'tools/dataset/diffusion_seed_learning'...",
-        "Listing 'tools/learning'...",
-        "Listing 'tools/learning/diffusion_seed_learning'...",
+        "Compiling 'tools/learning/diffusion_seed_learning/diffusion.py'...",
+        "Compiling 'tools/learning/diffusion_seed_learning/evaluate.py'...",
+        "Compiling 'tools/learning/diffusion_seed_learning/evaluate_critic.py'...",
+        "Compiling 'tools/learning/diffusion_seed_learning/model_unet1d.py'...",
+        "Compiling 'tools/learning/diffusion_seed_learning/sample.py'...",
+        "Compiling 'tools/learning/diffusion_seed_learning/train.py'...",
+        "Compiling 'tools/learning/diffusion_seed_learning/train_critic.py'...",
         "Listing 'tests'...",
-        "Listing 'launch'..."
+        "Compiling 'tests/test_constraints_smoke.py'...",
+        "Compiling 'tests/test_import_smoke.py'...",
+        "Listing 'launch'...",
+        "Compiling 'launch/level_planner.launch.py'..."
       ]
     },
     "artifact_json": {
@@ -39,7 +40,7 @@
         "artifacts/current_artifacts.json"
       ],
       "returncode": 0,
-      "elapsed_sec": 0.104614,
+      "elapsed_sec": 0.089092,
       "stdout_tail": [
         "        \"path\": \"/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_mature_diffusion_20260715_offline_generation_report.json\",",
         "        \"exists\": true,",
@@ -63,7 +64,7 @@
         "configs/sr5_level.yaml"
       ],
       "returncode": 0,
-      "elapsed_sec": 0.254811,
+      "elapsed_sec": 0.239135,
       "stdout_tail": [
         "      \"ok\": true,",
         "      \"required\": true,",
@@ -86,7 +87,7 @@
         "--strict"
       ],
       "returncode": 0,
-      "elapsed_sec": 0.128953,
+      "elapsed_sec": 0.070796,
       "stdout_tail": [
         "      \"size_bytes\": 4015350",
         "    },",
@@ -273,7 +274,7 @@
       "count": 2,
       "valid_count": 2,
       "valid_ratio": 1.0,
-      "max_joint_step_l2": 0.3596627116203308,
+      "max_joint_step_l2": 0.27731484174728394,
       "max_start_gap_l2": 0.0
     },
     "rule_positive_replay": {
@@ -287,7 +288,7 @@
       "count": 2,
       "valid_count": 0,
       "valid_ratio": 0.0,
-      "max_joint_step_l2": 5.003362655639648,
+      "max_joint_step_l2": 5.093034744262695,
       "max_start_gap_l2": 0.0
     }
   },
@@ -301,15 +302,15 @@
         "level_planner_ros"
       ],
       "returncode": 0,
-      "elapsed_sec": 7.230328,
+      "elapsed_sec": 7.267811,
       "stdout_tail": [
         "Starting >>> level_planner_ros",
         "/pub/data/caohy/miniconda/envs/CuroboV2/lib/python3.10/site-packages/wheel/bdist_wheel.py:4: FutureWarning: The 'wheel' package is no longer the canonical location of the 'bdist_wheel' command, and will be removed in a future release. Please update to setuptools v70.1 or later which contains an integrated version of this command.",
         "  warn(",
         "toml section missing PosixPath('pyproject.toml') does not contain a tool.setuptools_scm section",
-        "Finished <<< level_planner_ros [6.40s]",
+        "Finished <<< level_planner_ros [6.46s]",
         "",
-        "Summary: 1 package finished [6.76s]"
+        "Summary: 1 package finished [6.80s]"
       ]
     },
     "run_check": {
