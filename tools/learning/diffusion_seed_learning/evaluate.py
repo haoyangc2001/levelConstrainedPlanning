@@ -11,15 +11,9 @@ from pathlib import Path
 import torch
 
 
-DEFAULT_GENERATED = Path(
-    "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/"
-    "sr5_phase4_generated_samples.json"
-)
-DEFAULT_JSON_OUT = Path(
-    "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/"
-    "offline_generation_report.json"
-)
-DEFAULT_MD_OUT = Path("readCaohy/plans/diffusionSeedLearning/diffusion_vs_rule_seed_report.md")
+DEFAULT_GENERATED = Path("runs/diffusion_seed_learning/generated_samples_smoke.json")
+DEFAULT_JSON_OUT = Path("runs/diffusion_seed_learning/offline_generation_report.json")
+DEFAULT_MD_OUT = Path("runs/diffusion_seed_learning/diffusion_vs_rule_seed_report.md")
 
 
 def parse_args() -> argparse.Namespace:
@@ -88,7 +82,7 @@ def main() -> None:
             "joint_step_max_l2": args.joint_step_max_l2,
             "joint_abs_limit": args.joint_abs_limit,
             "start_gap_l2": 1e-5,
-            "note": "Phase 4 smoke precheck; hard FK/collision validation remains phase 3/6 responsibility.",
+            "note": "Standalone phase 6 seed precheck; CuRobo repair and hard FK/collision validation remain mandatory.",
         },
         "diffusion_seed": summarize_checks(diffusion_checks),
         "rule_positive_replay": summarize_checks(rule_replay_checks),
@@ -99,15 +93,15 @@ def main() -> None:
     args.md_out.parent.mkdir(parents=True, exist_ok=True)
     args.md_out.write_text(
         "\n".join([
-            "<!-- [caohy] diffusionSeedLearning 阶段 4 smoke 评估报告 -->",
-            "# Diffusion Vs Rule Seed Smoke Report",
+            "<!-- standaloneLevelPlanning phase 6 diffusion seed smoke report -->",
+            "# Diffusion Seed Smoke Report",
             "",
             f"- generated: `{args.generated}`",
             f"- diffusion valid ratio: `{report['diffusion_seed']['valid_ratio']:.3f}`",
             f"- rule positive replay valid ratio: `{report['rule_positive_replay']['valid_ratio']:.3f}`",
             f"- random valid ratio: `{report['random_seed']['valid_ratio']:.3f}`",
             "",
-            "当前阶段只有 4 条 positive trajectory，报告只证明训练/采样/预检闭环可运行，不作为最终模型质量结论。",
+            "该报告只证明训练/采样/预检工具链可运行，不替代 CuRobo repair 与 hard validation。",
             "",
         ]),
         encoding="utf-8",

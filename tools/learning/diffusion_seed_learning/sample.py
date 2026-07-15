@@ -13,16 +13,11 @@ import torch
 from dataset import DEFAULT_VALIDATED_SAMPLES, Normalization, TrajectorySeedDataset
 from diffusion import GaussianDiffusion1D
 from model_unet1d import TemporalUNet1D
+from artifact_paths import artifact_path
 
 
-DEFAULT_CHECKPOINT = Path(
-    "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/"
-    "sr5_phase4_smoke_baseline/best.pt"
-)
-DEFAULT_OUT = Path(
-    "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/"
-    "sr5_phase4_generated_samples.json"
-)
+DEFAULT_CHECKPOINT = artifact_path("diffusion", "best_checkpoint")
+DEFAULT_OUT = Path("runs/diffusion_seed_learning/generated_samples_smoke.json")
 
 
 def parse_args() -> argparse.Namespace:

@@ -16,12 +16,12 @@ import torch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO_ROOT / "src" / "curobo_v2_planner"))
+sys.path.insert(0, str(REPO_ROOT))
 
 from curobo.motion_planner import MotionPlanner, MotionPlannerCfg  # noqa: E402
 from curobo.types import JointState as CuJointState  # noqa: E402
-from curobo_v2_planner import constraint_utils  # noqa: E402
-from curobo_v2_planner.rokae_asset_utils import resolve_robot_config  # noqa: E402
+from level_planner_core import constraints as constraint_utils  # noqa: E402
+from level_planner_core.robot_assets import resolve_robot_config  # noqa: E402
 
 
 VALIDATOR_SCHEMA_VERSION = "offline_hard_validator.v1"
@@ -29,10 +29,8 @@ DEFAULT_MANIFEST = Path(
     "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/"
     "datasets/sr5_phase2_20260713_lifecycle_baseline/manifest.json"
 )
-DEFAULT_REPORT_OUT = Path("readCaohy/plans/diffusionSeedLearning/validator_report.json")
-DEFAULT_RULES_OUT = Path(
-    "readCaohy/plans/diffusionSeedLearning/positive_sample_filter_rules.json"
-)
+DEFAULT_REPORT_OUT = Path("runs/diffusion_seed_learning/validator_report.json")
+DEFAULT_RULES_OUT = Path("runs/diffusion_seed_learning/positive_sample_filter_rules.json")
 
 
 def parse_args() -> argparse.Namespace:
@@ -44,7 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--robot-config",
         type=Path,
-        default=Path("resource/config/Level_Test_V2_caohy/robot/xms5_r800_w4g3b4c_v2.yml"),
+        default=Path("configs/robot/xms5_r800_w4g3b4c_v2.yml"),
     )
     parser.add_argument("--alignment-tolerance-deg", type=float, default=None)
     parser.add_argument("--goal-position-tolerance-m", type=float, default=0.02)

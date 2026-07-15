@@ -15,12 +15,10 @@ from torch.utils.data import DataLoader
 
 from critic import SuccessCriticDataset, SuccessCriticMLP
 from dataset import DEFAULT_VALIDATED_SAMPLES
+from artifact_paths import public_root
 
 
-DEFAULT_CRITIC_DIR = Path(
-    "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/"
-    "sr5_phase7_success_critic_smoke"
-)
+DEFAULT_CRITIC_DIR = public_root() / "checkpoints/standalone_sr5_success_critic"
 
 
 def parse_args() -> argparse.Namespace:

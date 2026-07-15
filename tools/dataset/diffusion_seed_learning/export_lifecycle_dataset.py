@@ -15,21 +15,19 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO_ROOT / "src" / "curobo_v2_planner"))
+sys.path.insert(0, str(REPO_ROOT))
 
-from curobo_v2_planner.seed_provider import infer_optimized, infer_source_type  # noqa: E402
+from level_planner_core.seed_provider import infer_optimized, infer_source_type  # noqa: E402
 
 
 SCHEMA_VERSION = "diffusion_lifecycle_dataset.v1"
 SCRIPT_VERSION = "phase2_exporter.v1"
 DEFAULT_LIFECYCLE_ROOT = Path("readCaohy/logs/trajectory_planning/level_plan_lifecycle")
 DEFAULT_PUBLIC_ROOT = Path("/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/datasets")
-DEFAULT_POINTER_OUT = Path(
-    "readCaohy/plans/diffusionSeedLearning/dataset_manifest_pointer.json"
-)
-DEFAULT_SUMMARY_OUT = Path("readCaohy/plans/diffusionSeedLearning/dataset_summary.md")
-DEFAULT_SCHEMA_PATH = Path("readCaohy/plans/diffusionSeedLearning/dataset_schema.json")
-DEFAULT_PROJECT_ROOT = Path("resource/config/Level_Test_V2_caohy")
+DEFAULT_POINTER_OUT = Path("runs/diffusion_seed_learning/dataset_manifest_pointer.json")
+DEFAULT_SUMMARY_OUT = Path("runs/diffusion_seed_learning/dataset_summary.md")
+DEFAULT_SCHEMA_PATH = Path("artifacts/source_dataset_schema.json")
+DEFAULT_PROJECT_ROOT = Path("configs")
 
 
 def parse_args() -> argparse.Namespace:

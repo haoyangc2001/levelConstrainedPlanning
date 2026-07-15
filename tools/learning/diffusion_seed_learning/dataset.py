@@ -11,11 +11,10 @@ from typing import Any
 import torch
 from torch.utils.data import Dataset
 
+from artifact_paths import artifact_path
 
-DEFAULT_VALIDATED_SAMPLES = Path(
-    "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/"
-    "datasets/sr5_phase2_20260713_lifecycle_baseline/samples_validated.jsonl"
-)
+
+DEFAULT_VALIDATED_SAMPLES = artifact_path("dataset", "training_dataset")
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:

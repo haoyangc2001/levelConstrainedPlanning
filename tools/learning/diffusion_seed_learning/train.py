@@ -14,12 +14,10 @@ from torch.utils.data import DataLoader
 from dataset import DEFAULT_VALIDATED_SAMPLES, TrajectorySeedDataset
 from diffusion import GaussianDiffusion1D
 from model_unet1d import TemporalUNet1D
+from artifact_paths import public_root
 
 
-DEFAULT_CHECKPOINT_DIR = Path(
-    "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/"
-    "sr5_phase4_smoke_baseline"
-)
+DEFAULT_CHECKPOINT_DIR = public_root() / "checkpoints/standalone_sr5_diffusion"
 
 
 def parse_args() -> argparse.Namespace:
