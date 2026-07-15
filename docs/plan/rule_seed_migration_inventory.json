@@ -1,0 +1,327 @@
+{
+  "schema_version": "level_constrained_planning.rule_seed_migration_inventory.v1",
+  "created_at": "2026-07-15",
+  "updated_at": "2026-07-15",
+  "purpose": "Define the minimum source-project closure needed to migrate reliable rule-based horizontal seed generation into the standalone core without bringing ROS, motion state machine or product dependencies.",
+  "source_files": {
+    "primary_v2_snapshot": "migration/source_snapshot/curobo_v2_planner/main.py",
+    "primary_v2_source": "/home/caohy/repositories/tashan_Manipulation/src/curobo_v2_planner/curobo_v2_planner/main.py",
+    "historical_v1_source": "/home/caohy/repositories/tashan_Manipulation/src/trajectory_planning/trajectory_planning/curobo_motion/curobo_motion_gen.py",
+    "current_standalone_core": [
+      "level_planner_core/planner.py",
+      "level_planner_core/constraints.py",
+      "level_planner_core/seed_provider.py",
+      "level_planner_core/result_schema.py"
+    ]
+  },
+  "migration_principles": [
+    "Migrate deterministic seed math and CuRobo IK/trajopt repair adapters only.",
+    "Keep all migrated logic behind SeedProvider or RepairAdapter-style core interfaces.",
+    "Do not migrate ROS node lifecycle, service callbacks, launch files, motion execution, external_comm, state machine code or real robot driver behavior.",
+    "Every migrated rule seed must become a CandidateRecord with source_lineage and validation metrics.",
+    "Rule seed remains the reliable fallback and the main offline data generation baseline."
+  ],
+  "source_inventory": [
+    {
+      "component": "single-goal GoalToolPose construction",
+      "source_reference": "migration/source_snapshot/curobo_v2_planner/main.py:1606",
+      "source_functions": [
+        "_make_goal_tool_pose"
+      ],
+      "current_standalone_match": "level_planner_core/planner.py:_collect_planner_candidates already constructs GoalToolPose.",
+      "dependency_class": "pure_curobo_api",
+      "migration_action": "Reuse existing standalone construction; move shared goal construction helper only if RepairAdapter needs it.",
+      "phase": 4,
+      "status": "reuse_existing"
+    },
+    {
+      "component": "trajectory seed shape adaptation",
+      "source_reference": "migration/source_snapshot/curobo_v2_planner/main.py:1616",
+      "source_functions": [
+        "_prepare_seed_traj_for_trajopt",
+        "_resample_seed_traj_linear"
+      ],
+      "current_standalone_match": "level_planner_core/planner.py:_resample_trajectory_linear handles [T, DOF] resampling for selection only.",
+      "dependency_class": "pure_tensor_plus_curobo_horizon",
+      "migration_action": "Implement core helper that converts SeedCandidate trajectory [T, DOF] to CuRobo seed_traj [batch, n, action_horizon, dof], using planner.trajopt_solver.action_horizon.",
+      "phase": 4,
+      "status": "must_migrate"
+    },
+    {
+      "component": "CuRobo explicit trajectory repair",
+      "source_reference": "migration/source_snapshot/curobo_v2_planner/main.py:2492",
+      "source_functions": [
+        "_solve_alignment_seed_trajopt"
+      ],
+      "current_standalone_match": "No equivalent; current core calls MotionPlanner.plan_pose only.",
+      "dependency_class": "curobo_internal_trajopt_solver",
+      "migration_action": "Wrap planner.trajopt_solver.solve_pose(goal, current_state, seed_traj=prepared_seed, use_implicit_goal=True, return_seeds=1, finetune_attempts=1). Preserve candidate id and source_lineage.",
+      "phase": 4,
+      "status": "must_migrate"
+    },
+    {
+      "component": "rule seed family configuration",
+      "source_reference": "migration/source_snapshot/curobo_v2_planner/main.py:3269",
+      "source_functions": [
+        "_get_alignment_trajopt_family_configs"
+      ],
+      "families": [
+        {
+          "source_label": "alignment_seed_trajopt_1",
+          "seed_family_name": "baseline_default",
+          "twist_schedule_mode": "uniform_shortest",
+          "goal_anchor_rank": 1,
+          "selection_mode": "default_score"
+        },
+        {
+          "source_label": "alignment_seed_trajopt_2",
+          "seed_family_name": "goal_anchor_rank_2",
+          "twist_schedule_mode": "uniform_shortest",
+          "goal_anchor_rank": 2,
+          "selection_mode": "default_score"
+        },
+        {
+          "source_label": "alignment_seed_trajopt_3",
+          "seed_family_name": "twist_delayed_to_goal",
+          "twist_schedule_mode": "delayed_to_goal",
+          "goal_anchor_rank": 1,
+          "selection_mode": "default_score"
+        },
+        {
+          "source_label": "alignment_seed_trajopt_4",
+          "seed_family_name": "branch_selection_in_limit_best",
+          "twist_schedule_mode": "uniform_shortest",
+          "goal_anchor_rank": 1,
+          "selection_mode": "in_limit_best"
+        }
+      ],
+      "dependency_class": "pure_config",
+      "migration_action": "Move to standalone rule seed provider config with request/runtime overrides for k_generate and k_accept.",
+      "phase": 3,
+      "status": "must_migrate"
+    },
+    {
+      "component": "single-family seed generation wrapper",
+      "source_reference": "migration/source_snapshot/curobo_v2_planner/main.py:5193",
+      "source_functions": [
+        "_generate_alignment_seed_family",
+        "_generate_alignment_seed_families"
+      ],
+      "dependency_class": "orchestration_plus_ik",
+      "migration_action": "Implement RuleLevelSeedProvider.generate() that loops family configs, calls the migrated alignment seed generator, emits SeedCandidate records for raw rule seeds and provider metadata.",
+      "phase": 3,
+      "status": "must_migrate"
+    },
+    {
+      "component": "family trajopt orchestration",
+      "source_reference": "migration/source_snapshot/curobo_v2_planner/main.py:5343",
+      "source_functions": [
+        "_optimize_single_alignment_seed_family",
+        "_optimize_alignment_seed_families"
+      ],
+      "dependency_class": "provider_to_repair_orchestration",
+      "migration_action": "Do not copy as one monolithic method. Split into RuleLevelSeedProvider for generation and RepairAdapter for CuRobo optimization so diffusion/rule share the same repair path.",
+      "phase": 4,
+      "status": "refactor_during_migration"
+    },
+    {
+      "component": "alignment seed generation core",
+      "source_reference": "migration/source_snapshot/curobo_v2_planner/main.py:6534",
+      "source_functions": [
+        "_generate_alignment_seed",
+        "_fk_single",
+        "_ik_solve_pose_all",
+        "_select_branch_consistent_seed_solution",
+        "_wrap_seed_solution_to_prev"
+      ],
+      "dependency_class": "math_plus_curobo_fk_ik",
+      "migration_action": "Migrate as a standalone rule seed module using planner.compute_kinematics and CuRobo IK. Reuse existing quaternion/twist helpers from level_planner_core.constraints where possible.",
+      "phase": 3,
+      "status": "must_migrate"
+    },
+    {
+      "component": "branch continuity and joint wrapping",
+      "source_reference": "migration/source_snapshot/curobo_v2_planner/main.py:7179 and :7550",
+      "source_functions": [
+        "_wrap_seed_solution_to_prev",
+        "_select_branch_consistent_seed_solution"
+      ],
+      "dependency_class": "pure_math_plus_joint_limits",
+      "migration_action": "Migrate into rule seed module with explicit SR5 joint limit config; remove logger-only side effects and return structured diagnostics.",
+      "phase": 3,
+      "status": "must_migrate"
+    },
+    {
+      "component": "split repair for branch jumps",
+      "source_reference": "migration/source_snapshot/curobo_v2_planner/main.py:6300",
+      "source_functions": [
+        "_optimize_alignment_seed_split",
+        "_solve_segment_cspace"
+      ],
+      "dependency_class": "curobo_cspace_repair",
+      "migration_action": "Defer until basic rule families and pose repair pass. Add as optional post-repair enhancement for candidates with large branch jump.",
+      "phase": 4,
+      "status": "optional_after_basic_repair"
+    },
+    {
+      "component": "smooth and bridge seed variants",
+      "source_reference": "migration/source_snapshot/curobo_v2_planner/main.py:6477 and :6499",
+      "source_functions": [
+        "_smooth_seed_traj_for_trajopt",
+        "_bridge_seed_jump_for_trajopt",
+        "_summarize_seed_step_metrics"
+      ],
+      "dependency_class": "pure_tensor_math",
+      "migration_action": "Migrate as optional rule seed variant transforms after the baseline families are available. They should produce new CandidateRecord rows, not mutate the original seed silently.",
+      "phase": 3,
+      "status": "optional_but_low_risk"
+    },
+    {
+      "component": "top-k explicit planner seeds",
+      "source_reference": "migration/source_snapshot/curobo_v2_planner/main.py:2545",
+      "source_functions": [
+        "_build_planner_topk_explicit_seed_inputs"
+      ],
+      "dependency_class": "ik_experiment",
+      "migration_action": "Keep as a later experiment. It is useful for diagnostics but not required for the first closed-loop seed provider.",
+      "phase": 4,
+      "status": "defer"
+    },
+    {
+      "component": "selection/lifecycle synchronization",
+      "source_reference": "migration/source_snapshot/curobo_v2_planner/main.py:3667 and :8053",
+      "source_functions": [
+        "_sync_diffusion_seed_report_with_selection",
+        "plan_single_level_constrained"
+      ],
+      "dependency_class": "ros_node_and_product_orchestration",
+      "migration_action": "Do not migrate directly. Reimplement in standalone PlannerRunRecord, CandidateRecord, fallback_trace and selector flow.",
+      "phase": 1,
+      "status": "replace_not_copy"
+    }
+  ],
+  "explicitly_excluded_dependencies": [
+    {
+      "dependency": "ROS node/service callback code",
+      "reason": "ROS adapter must remain a thin entry layer and cannot own core planner control flow."
+    },
+    {
+      "dependency": "motion execution and robot driver calls",
+      "reason": "This standalone project is plan-only for the current milestone."
+    },
+    {
+      "dependency": "external_comm and product workflow state machine",
+      "reason": "They are outside the closed-loop planning core and would make the repository heavy again."
+    },
+    {
+      "dependency": "RViz visualization and UI panels",
+      "reason": "Headless validation is the default environment."
+    },
+    {
+      "dependency": "legacy environment-variable experiment switches as primary API",
+      "reason": "Standalone behavior must be controlled by request seed_policy and config, while env vars may remain debug overrides only."
+    }
+  ],
+  "standalone_target_modules": {
+    "level_planner_core/rule_seed.py": {
+      "responsibility": "Generate raw rule SeedCandidate objects for SR5 horizontal alignment families.",
+      "inputs": [
+        "normalized request",
+        "joint names",
+        "tool frames",
+        "CuRobo compute_kinematics",
+        "CuRobo IK solve helper"
+      ],
+      "outputs": [
+        "SeedProviderResult",
+        "raw rule SeedCandidate list",
+        "structured diagnostics"
+      ]
+    },
+    "level_planner_core/repair.py": {
+      "responsibility": "Run CuRobo repair for external rule/diffusion seeds and planner-native candidates through a shared adapter.",
+      "inputs": [
+        "SeedCandidate",
+        "GoalToolPose",
+        "current JointState",
+        "MotionPlanner.trajopt_solver"
+      ],
+      "outputs": [
+        "repaired CandidateRecord fields",
+        "optimizer_result",
+        "failure_stage/failure_reason"
+      ]
+    },
+    "level_planner_core/validators.py": {
+      "responsibility": "Produce hard_validation_metric_contract fields for every candidate.",
+      "inputs": [
+        "candidate trajectory",
+        "normalized request",
+        "kinematics function",
+        "robot joint limit config",
+        "world/collision adapter when available"
+      ],
+      "outputs": [
+        "validator_metrics",
+        "validator_valid",
+        "failure_reason"
+      ]
+    }
+  },
+  "migration_sequence": [
+    {
+      "step": 1,
+      "phase": 3,
+      "action": "Add RuleLevelSeedProvider with static family configs and pure math/twist helper reuse."
+    },
+    {
+      "step": 2,
+      "phase": 3,
+      "action": "Add FK/IK helper closure from the initialized planner without ROS dependencies."
+    },
+    {
+      "step": 3,
+      "phase": 3,
+      "action": "Emit raw rule SeedCandidate rows with precheck, lineage and diagnostics."
+    },
+    {
+      "step": 4,
+      "phase": 4,
+      "action": "Add RepairAdapter around trajopt_solver.solve_pose(seed_traj=...)."
+    },
+    {
+      "step": 5,
+      "phase": 4,
+      "action": "Admit rule and diffusion seeds into the same repair pool and then into the unified validator."
+    },
+    {
+      "step": 6,
+      "phase": 6,
+      "action": "Use rule provider as learned-first fallback and data generation baseline."
+    }
+  ],
+  "audit_result": {
+    "minimum_migration_closure_is_clear": true,
+    "ros_or_product_dependencies_required": false,
+    "first_required_rule_families": 4,
+    "first_required_curobo_calls": [
+      "MotionPlanner.compute_kinematics",
+      "IK solver solve_pose or equivalent available from planner internals",
+      "MotionPlanner.trajopt_solver.solve_pose"
+    ],
+    "risk_items": [
+      {
+        "risk": "CuRobo internal IK/trajopt solver APIs are less stable than MotionPlanner.plan_pose.",
+        "mitigation": "Keep all direct internal calls in repair/rule_seed adapters and cover with smoke tests."
+      },
+      {
+        "risk": "Branch jump handling can produce valid alignment but poor continuity.",
+        "mitigation": "Run unified hard validator and keep split/smooth/bridge variants as separate candidates for critic learning."
+      },
+      {
+        "risk": "Collision replay may remain optional until validator adapter is complete.",
+        "mitigation": "Record collision_unchecked explicitly and keep it out of positive labels when strict collision validation is required."
+      }
+    ]
+  }
+}

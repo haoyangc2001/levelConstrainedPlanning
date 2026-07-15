@@ -1,0 +1,363 @@
+{
+  "schema_version": "level_constrained_planning.closed_loop_contract.v1",
+  "created_at": "2026-07-15",
+  "updated_at": "2026-07-15",
+  "purpose": "Freeze the shared run, candidate, dataset, label and validation contracts for the closed-loop system: data generation -> model learning -> optimization validation -> failure fallback -> data update.",
+  "scope": {
+    "repository": "/home/caohy/repositories/levelConstrainedPlanning",
+    "first_robot": "sr5",
+    "first_constraint": "tool1 y+ aligned to world z-",
+    "core_dependency_boundary": [
+      "level_planner_core may depend on CuRobo, torch, local config and local asset loaders.",
+      "level_planner_core must not depend on ROS, RViz, motion state machines, external_comm, hardware drivers or product-specific task orchestration.",
+      "Large datasets, run bundles and checkpoints stay under /pub/data/caohy/levelConstrainedPlanning."
+    ]
+  },
+  "storage_policy": {
+    "repo_small_artifacts": [
+      "schema files",
+      "artifact pointers",
+      "small smoke reports",
+      "documentation",
+      "tests"
+    ],
+    "external_large_root": "/pub/data/caohy/levelConstrainedPlanning",
+    "external_large_artifacts": [
+      "candidate trajectory jsonl",
+      "full run lifecycle bundles",
+      "offline generation results",
+      "benchmark bundles",
+      "training checkpoints"
+    ],
+    "trajectory_storage_rule": "Planner result JSON may keep selected trajectory for compatibility. Candidate datasets should keep small trajectories inline, and may store large full-resolution trajectories by artifact_path plus sha256."
+  },
+  "versioning": {
+    "planner_result_schema_version": "2.0",
+    "planner_run_record_schema_version": "planner_run_record.v1",
+    "candidate_record_schema_version": "candidate_record.v1",
+    "dataset_sample_record_schema_version": "dataset_sample_record.v1",
+    "compatibility_rule": "Existing result.json fields remain readable; new closed-loop fields are additive."
+  },
+  "record_definitions": {
+    "PlannerRunRecord": {
+      "description": "One online or offline planning request execution. It is the parent object for all candidates, fallback attempts and exportable dataset samples.",
+      "required_fields": {
+        "schema_version": "planner_run_record.v1",
+        "run_id": "Stable unique id for the execution, preferably request_id plus timestamp or uuid.",
+        "request_id": "User or batch supplied request id.",
+        "created_at": "ISO-8601 timestamp.",
+        "robot_profile": "sr5 for the first implementation.",
+        "request": "Original request payload after JSON-safe normalization.",
+        "normalized_request": "Planner-normalized request used by core, including start_joint, target_pose, alignment and seed_policy.",
+        "world_summary": "Obstacle/world summary from level_planner_core.world, including box counts and source paths when available.",
+        "seed_policy": "Effective seed policy after defaults and runtime downgrades.",
+        "seed_provider_reports": "List of provider-level reports for planner_native, rule_seed, diffusion_seed and critic when enabled.",
+        "candidates": "CandidateRecord list or artifact reference to candidates.jsonl.",
+        "fallback_trace": "Ordered stages showing learned-first attempts, failure causes and rule/native fallback recovery.",
+        "result_status": "Final planner status.",
+        "failure_reason": "Final failure reason when result_status is not success.",
+        "selected_candidate_id": "Candidate id chosen as final trajectory, or null.",
+        "metrics": "Run-level metrics and selected-candidate metric summaries.",
+        "timings": "Wall time by seed generation, repair, validation, selection, fallback and total.",
+        "artifacts": "Paths to result.json, lifecycle.json, candidate_summary.json, candidates.jsonl and trajectory files."
+      },
+      "optional_fields": {
+        "planner_version": "Git commit, package version or local build id.",
+        "environment": "CuRobo, CUDA, torch, python, GPU and device info.",
+        "artifact_pointer": "artifacts/current_artifacts.json snapshot or hash used by learned providers.",
+        "dataset_export": "Export status after this run is converted into candidate samples."
+      },
+      "status_enum": [
+        "success",
+        "failed_precheck",
+        "failed_goal",
+        "failed_alignment_constraint",
+        "failed_planner",
+        "failed_internal_error",
+        "failed_all_fallbacks"
+      ]
+    },
+    "CandidateRecord": {
+      "description": "One seed or optimized trajectory candidate. Every planner-native, rule, diffusion, critic-selected and fallback candidate should be represented with the same lifecycle fields.",
+      "required_fields": {
+        "schema_version": "candidate_record.v1",
+        "candidate_id": "Unique within run_id.",
+        "run_id": "Parent PlannerRunRecord id.",
+        "request_id": "Parent request id.",
+        "source_lineage": "Structured source provenance.",
+        "trajectory": "Raw seed trajectory, repaired trajectory, selected trajectory or artifact reference.",
+        "lifecycle": "Generated/prechecked/pool/repaired/validated/selected stage booleans and statuses.",
+        "precheck": "Cheap shape/start/step/joint-absolute checks before repair pool admission.",
+        "optimizer_result": "CuRobo repair or native planner status, timing and returned trajectory summary.",
+        "validator_metrics": "Hard validation metrics using the frozen metric set.",
+        "labels": "Training and audit labels derived from lifecycle and validation.",
+        "failure_stage": "First failed stage, or null on success.",
+        "failure_reason": "Machine-readable failure reason, or null on success."
+      },
+      "source_lineage": {
+        "source_type_enum": [
+          "planner_native",
+          "rule_seed",
+          "rule_raw_seed",
+          "diffusion_seed",
+          "critic_selected",
+          "fallback_rule_seed",
+          "fallback_native",
+          "unknown"
+        ],
+        "required_fields": [
+          "source_type",
+          "source_label",
+          "provider",
+          "provider_mode"
+        ],
+        "optional_fields": [
+          "parent_candidate_id",
+          "model_run_name",
+          "model_checkpoint",
+          "critic_checkpoint",
+          "generated_sample_id",
+          "rule_family_name",
+          "rule_family_config",
+          "source_artifact_path"
+        ]
+      },
+      "trajectory": {
+        "format": "joint_position_rad",
+        "shape": [
+          "T",
+          "DOF"
+        ],
+        "fields": {
+          "points": "Inline list[list[float]] for small or training samples.",
+          "raw_seed_points": "Optional raw seed before repair.",
+          "repaired_points": "Optional CuRobo repaired output.",
+          "selected_points": "Optional final selected trajectory copy.",
+          "artifact_path": "Optional path when trajectory is too large for inline JSONL.",
+          "sha256": "Optional hash for external trajectory artifact.",
+          "horizon": "Waypoint count after resampling.",
+          "dof": "Joint dimension."
+        }
+      },
+      "lifecycle": {
+        "generated": "Candidate was produced by a provider or native planner.",
+        "precheck_passed": "Candidate passed cheap input prechecks.",
+        "entered_pool": "Candidate was admitted into the repair/selection pool.",
+        "repair_attempted": "CuRobo native planning or trajopt repair was executed.",
+        "repair_success": "Optimizer returned at least one usable trajectory.",
+        "hard_validation_attempted": "Unified validator was run.",
+        "hard_validation_passed": "Validator accepted the trajectory.",
+        "selected": "Candidate became final output.",
+        "fallback_recovered": "This candidate succeeded after an earlier learned or primary path failed."
+      }
+    },
+    "DatasetSampleRecord": {
+      "description": "Flat JSONL row consumed by diffusion and Success Critic training.",
+      "required_fields": {
+        "schema_version": "dataset_sample_record.v1",
+        "dataset_name": "Versioned dataset id.",
+        "sample_id": "Stable unique row id.",
+        "sample_type": "candidate",
+        "source": "Result/lifecycle/run artifact provenance.",
+        "task": "Robot, tool frame, target pose, alignment and obstacle summary.",
+        "start_state": "service_start_joint and optional normalized start fields.",
+        "obstacle_world": "World summary suitable for conditioning and audit.",
+        "candidate": "CandidateRecord-derived compact candidate object with trajectory.points or artifact_path.",
+        "source_lineage": "Source lineage copied from CandidateRecord.",
+        "labels": "Training labels and validation labels."
+      },
+      "compatibility_notes": [
+        "TrajectorySeedDataset currently requires sample_type == candidate and candidate.trajectory.points.",
+        "SuccessCriticDataset currently requires sample_type == candidate and candidate.trajectory.points.",
+        "Exporter may also emit request_failure samples later, but they are not diffusion positives."
+      ]
+    }
+  },
+  "label_contract": {
+    "positive_for_diffusion": {
+      "true_when": [
+        "sample_type is candidate",
+        "trajectory points are present and finite",
+        "candidate is repair_success or planner_native success",
+        "hard_validation_passed is true",
+        "trajectory satisfies alignment, goal, continuity, joint limit and available collision checks"
+      ],
+      "false_when": [
+        "candidate failed repair",
+        "candidate failed hard validation",
+        "candidate is only a request_failure sample",
+        "candidate is shadow-only and never repaired unless explicitly marked usable_by_shadow_validation"
+      ],
+      "training_use": "Diffusion maximum-likelihood training uses positive_for_diffusion rows only."
+    },
+    "positive_for_critic": {
+      "true_when": [
+        "candidate hard_validation_passed is true",
+        "candidate is selected or accepted as a success under the fixed budget policy"
+      ],
+      "training_use": "Success classifier positive target."
+    },
+    "negative_for_critic": {
+      "true_when": [
+        "candidate repair failed",
+        "candidate hard validation failed",
+        "candidate was rejected by pool precheck",
+        "candidate was valid but not selected when policy needs ranking negatives"
+      ],
+      "training_use": "Success classifier negative target and regression risk supervision."
+    },
+    "fallback_recovered": {
+      "true_when": [
+        "a learned-first or primary path failed before the selected fallback candidate succeeded"
+      ],
+      "training_use": "Measures data generation and online recovery value."
+    },
+    "validator_valid": {
+      "true_when": [
+        "all required hard validation metrics pass"
+      ],
+      "false_when": [
+        "any required metric fails or is missing"
+      ]
+    }
+  },
+  "hard_validation_metric_contract": {
+    "required_metrics": {
+      "alignment": {
+        "fields": [
+          "max_alignment_deviation_deg",
+          "mean_alignment_deviation_deg",
+          "alignment_tolerance_deg",
+          "valid"
+        ],
+        "failure_reason": "failed_alignment_constraint"
+      },
+      "goal": {
+        "fields": [
+          "terminal_position_error_m",
+          "terminal_orientation_error_rad",
+          "position_tolerance_m",
+          "orientation_tolerance_rad",
+          "valid"
+        ],
+        "failure_reason": "failed_goal"
+      },
+      "continuity": {
+        "fields": [
+          "start_joint_gap_l2",
+          "joint_step_max_l2",
+          "joint_step_jump_cost",
+          "twist_smoothness_cost",
+          "valid"
+        ],
+        "failure_reason": "failed_continuity"
+      },
+      "joint_limit": {
+        "fields": [
+          "valid",
+          "min_margin_rad",
+          "violating_joint_names",
+          "max_abs_position_rad"
+        ],
+        "failure_reason": "failed_joint_limit"
+      },
+      "optimizer": {
+        "fields": [
+          "status",
+          "success",
+          "solve_time_sec",
+          "result_status",
+          "attempt_count"
+        ],
+        "failure_reason": "repair_failed"
+      }
+    },
+    "optional_until_available": {
+      "collision_safety": {
+        "fields": [
+          "valid",
+          "min_distance_m",
+          "collision_activation_distance_m",
+          "checked",
+          "reason_if_unchecked"
+        ],
+        "missing_policy": "unchecked is allowed during early standalone phases but must be recorded as collision_unchecked, not silently omitted."
+      },
+      "velocity_acceleration": {
+        "fields": [
+          "max_velocity_rad_s",
+          "max_acceleration_rad_s2",
+          "valid",
+          "dt_sec"
+        ],
+        "missing_policy": "optional until trajectory timing is exported; missing values must be recorded as not_available."
+      }
+    },
+    "missing_required_metric_policy": {
+      "validator_valid": false,
+      "failure_reason": "required_validator_metric_missing"
+    }
+  },
+  "failure_taxonomy": {
+    "precheck": [
+      "invalid_request",
+      "invalid_shape_or_dof",
+      "start_gap_exceeds_threshold",
+      "joint_abs_limit_exceeded",
+      "seed_step_exceeds_threshold"
+    ],
+    "generation": [
+      "rule_seed_generation_failed",
+      "diffusion_generation_failed",
+      "model_checkpoint_missing",
+      "critic_checkpoint_missing",
+      "model_timeout"
+    ],
+    "repair": [
+      "repair_api_unavailable",
+      "repair_failed",
+      "trajopt_failed",
+      "cspace_repair_failed",
+      "curobo_exception"
+    ],
+    "validation": [
+      "failed_alignment_constraint",
+      "failed_goal",
+      "failed_continuity",
+      "failed_joint_limit",
+      "failed_collision_safety",
+      "failed_velocity_acceleration",
+      "required_validator_metric_missing"
+    ],
+    "fallback": [
+      "learned_generation_failed",
+      "learned_repair_failed",
+      "learned_validation_failed",
+      "fallback_rule_failed",
+      "fallback_validation_failed",
+      "failed_all_fallbacks"
+    ]
+  },
+  "artifact_contract": {
+    "per_run_files": {
+      "result.json": "Backwards-compatible top-level PlannerResult.",
+      "lifecycle.json": "PlannerRunRecord without large external trajectory payloads when necessary.",
+      "candidate_summary.json": "Small human-readable candidate summary.",
+      "candidates.jsonl": "One CandidateRecord per line.",
+      "trajectories/": "Optional external trajectory payloads keyed by candidate id."
+    },
+    "dataset_files": {
+      "samples.jsonl": "DatasetSampleRecord rows.",
+      "manifest.json": "Dataset version, source bundles, counts, hashes and label distribution.",
+      "summary.json": "Machine summary for automation.",
+      "summary.md": "Human report."
+    }
+  },
+  "migration_impact": {
+    "phase_1": "Implement dataclasses/export helpers that produce PlannerRunRecord and CandidateRecord while preserving existing result.json.",
+    "phase_2": "Validator must fill hard_validation_metric_contract fields before labels are derived.",
+    "phase_4": "Repair adapter must populate optimizer_result and preserve source_lineage for every seed.",
+    "phase_7": "Dataset exporter must emit sample_type=candidate rows compatible with current diffusion and critic loaders.",
+    "phase_8": "Training scripts may upgrade loaders but must keep this contract as the source of truth."
+  }
+}

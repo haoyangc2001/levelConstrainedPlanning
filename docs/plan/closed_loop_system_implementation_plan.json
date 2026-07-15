@@ -80,7 +80,7 @@
     {
       "id": "G0",
       "name": "外部 trajectory seed 注入 cuRobo repair 可行性",
-      "status": "not_started",
+      "status": "passed",
       "required_before_phase": 4,
       "questions": [
         "CuRobo V2 MotionPlanner 是否支持直接接收外部 cspace trajectory seed 或 seed trajectory batch？",
@@ -91,6 +91,12 @@
         "完成最小 spike：一条手工 seed 能被送入 CuRobo repair，并输出 success/failure 和 optimized trajectory。",
         "确认无法直接注入时，给出 fallback 技术路线和影响范围。",
         "形成 seed_repair_api_notes.md 或同等 JSON 结论记录。"
+      ],
+      "actual_result": [
+        "确认 MotionPlanner.plan_pose 不直接接受 seed_traj，需封装 planner.trajopt_solver.solve_pose(seed_traj=...)。",
+        "常量手工 seed spike 可进入 TrajOptSolverResult 并返回插值轨迹；native trajectory 作为外部 seed 回灌 repair 成功。",
+        "seed_traj 形状冻结为 [batch, n, action_horizon, dof]，SR5 单任务单 seed 为 [1, 1, H, 6]。",
+        "结论记录在 docs/plan/seed_repair_api_notes.md。"
       ]
     },
     {
@@ -115,15 +121,15 @@
       "id": 0,
       "name": "闭环契约冻结与迁移审计",
       "priority": "P0",
-      "status": "not_started",
-      "completed": false,
+      "status": "completed",
+      "completed": true,
       "objective": "在正式实现前冻结闭环系统的数据契约、seed repair 可行性和源项目规则种子迁移边界。",
       "tasks": [
         {
           "id": "0.1",
           "description": "冻结 PlannerRunRecord、CandidateRecord、DatasetSampleRecord 三层 schema。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [],
           "details": [
             "明确 request、world、seed_provider、candidate、optimized_result、validator_metrics、fallback_trace、labels、artifacts 字段。",
@@ -134,8 +140,8 @@
         {
           "id": "0.2",
           "description": "审计 CuRobo V2 外部 seed repair API 可行性。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "0.1"
           ],
@@ -148,8 +154,8 @@
         {
           "id": "0.3",
           "description": "审计源项目规则化水平种子族的最小迁移闭包。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "0.1"
           ],
@@ -162,8 +168,8 @@
         {
           "id": "0.4",
           "description": "冻结 hard validation 指标集合。",
-          "status": "not_started",
-          "completed": false,
+          "status": "completed",
+          "completed": true,
           "depends_on": [
             "0.1"
           ],
@@ -183,6 +189,19 @@
         "外部 seed repair 技术路线已明确。",
         "candidate dataset schema 能覆盖成功、失败、回退和 shadow learned seed。",
         "规则种子迁移边界清晰，不会引入产品栈依赖。"
+      ],
+      "actual_outputs": [
+        "docs/plan/closed_loop_schema_contract.json",
+        "docs/plan/seed_repair_api_notes.md",
+        "docs/plan/rule_seed_migration_inventory.json",
+        "runs/phase0_seed_repair_spike/report.json",
+        "runs/phase0_seed_repair_spike/native_seed_report.json"
+      ],
+      "verification": [
+        "python3 -m json.tool docs/plan/closed_loop_schema_contract.json",
+        "python3 -m json.tool docs/plan/rule_seed_migration_inventory.json",
+        "CuRobo V2 introspection confirmed TrajOptSolver.solve_pose(seed_traj=...) signature.",
+        "Phase 0 live spike confirmed native-plan external seed repair_success=true."
       ]
     },
     {
