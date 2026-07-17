@@ -432,6 +432,7 @@ def select_level_first_candidate(
     continuity_metrics: Dict[str, torch.Tensor],
     level_tolerance_deg: float = 3.0,
     strict_level: bool = True,
+    ignore_alignment_for_selection: bool = False,
 ) -> Dict[str, Any]:
     """选择最优候选轨迹（alignment-first 策略）。
 
@@ -448,6 +449,11 @@ def select_level_first_candidate(
         continuity_metrics: compute_candidate_continuity_metrics 的结果。
         level_tolerance_deg: 对齐容差（度）。
         strict_level: 是否严格要求对齐。
+        ignore_alignment_for_selection: 若为 True，则完全忽略水平约束进行
+            候选选择与 planning_status 判定（B4 单向学习种子 baseline：模拟
+            level-agnostic 的 DiffusionSeeder，只按连续性/路径代价选点、以
+            『到达目标』为成功定义）。候选级别的真实对齐偏差仍照常记录，供
+            报告层量化真实水平违约率。默认 False（保持 level-first 语义）。
 
     Returns:
         包含 selected_index, planning_status 等的字典。
@@ -488,6 +494,37 @@ def select_level_first_candidate(
         'strict_level': bool(strict_level),
     }
 
+    _MAX_L2_QUANT = 0.5
+    _GAP_QUANT = 0.05
+
+    def _continuity_sort_key(idx: int):
+        return (
+            round(float(start_joint_gap_l2[idx].item()) / _GAP_QUANT),
+            round(float(joint_step_max_l2[idx].item()) / _MAX_L2_QUANT),
+            float(joint_step_mean_l2[idx].item()),
+            float(twist_smoothness_cost[idx].item()),
+            float(joint_path_cost[idx].item()),
+        )
+
+    if ignore_alignment_for_selection:
+        # B4 单向学习种子 baseline：level-agnostic 选择——无视对齐，仅按连续性/
+        # 路径代价挑最平滑候选，以『到达目标』为成功定义。真实对齐偏差已在
+        # candidate_max_alignment_deviation 中记录，报告层据此量化真实违约率。
+        best_idx = min(range(B), key=_continuity_sort_key)
+        result.update({
+            'selected_index': int(best_idx),
+            'selected_max_alignment_deviation': round(float(max_dev[best_idx].item()), 4),
+            'selected_start_joint_gap_l2': round(float(start_joint_gap_l2[best_idx].item()), 6),
+            'selected_joint_step_jump_cost': round(float(joint_step_jump_cost[best_idx].item()), 6),
+            'selected_joint_step_max_abs': round(float(joint_step_max_abs[best_idx].item()), 6),
+            'selected_joint_step_max_l2': round(float(joint_step_max_l2[best_idx].item()), 6),
+            'selected_twist_smoothness_cost': round(float(twist_smoothness_cost[best_idx].item()), 6),
+            'planning_status': 'success',
+            'failure_reason': None,
+            'selection_mode': 'goal_only_alignment_ignored',
+        })
+        return result
+
     if alignment_valid_count > 0:
         valid_indices = torch.where(alignment_valid)[0]
         # [caohy] Task 40：对 joint_step_max_l2 做容差量化（0.5 rad 一档）作为粗分主键，
@@ -497,18 +534,7 @@ def select_level_first_candidate(
         # max_l2 差异大的候选（如 planner vs seed）仍落不同档，保持原有 max-jump 优先行为。
         # start_joint_gap_l2 也做量化（0.05 rad 一档）：split 经 cspace 优化后起点可能有微小偏移，
         # 不量化会让它在首键就与起点精确的原始种子分开，量化 max_l2 失去意义。
-        _MAX_L2_QUANT = 0.5
-        _GAP_QUANT = 0.05
-        best_valid_idx = min(
-            valid_indices.tolist(),
-            key=lambda idx: (
-                round(float(start_joint_gap_l2[idx].item()) / _GAP_QUANT),
-                round(float(joint_step_max_l2[idx].item()) / _MAX_L2_QUANT),
-                float(joint_step_mean_l2[idx].item()),
-                float(twist_smoothness_cost[idx].item()),
-                float(joint_path_cost[idx].item()),
-            ),
-        )
+        best_valid_idx = min(valid_indices.tolist(), key=_continuity_sort_key)
         result.update({
             'selected_index': int(best_valid_idx),
             'selected_max_alignment_deviation': round(float(max_dev[best_valid_idx].item()), 4),

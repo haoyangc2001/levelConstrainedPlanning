@@ -41,7 +41,11 @@ class MethodSpec:
     ``config.learned_seed_use_critic``. ``fallback_to_rule`` /
     ``fallback_to_native`` control the control-flow fallbacks. ``external`` marks
     a Phase B baseline that does not use the internal planner control flow (its
-    ``runner`` is invoked instead).
+    ``runner`` is invoked instead). ``report_goal_only`` (B4) removes the
+    level-first selection gate at the *report layer*: the planner selects by
+    continuity/path cost ignoring alignment and reports success on goal-reaching,
+    while the true per-candidate alignment deviation is still recorded so the
+    summariser measures the real level-violation rate of a level-agnostic seeder.
     """
 
     name: str
@@ -51,6 +55,7 @@ class MethodSpec:
     fallback_to_native: bool = False
     external: bool = False
     runner: Callable[..., dict[str, Any]] | None = None
+    report_goal_only: bool = False
     description: str = ""
 
 
@@ -124,6 +129,29 @@ def _register_defaults() -> None:
             ),
         )
     )
+    # B4: one-way learned seeds (DiffusionSeeder-style). Same diffusion seeding as
+    # diffusion_only (critic off, no fallback), but with the level-first selection
+    # gate stripped at the *report layer* (report_goal_only=True): the planner
+    # selects the smoothest goal-reaching candidate ignoring alignment and reports
+    # success on goal-reaching -- faithful to a level-agnostic learned seeder that
+    # is repaired to the goal but never gated on the level constraint. The true
+    # per-candidate alignment deviation is still recorded, so the summariser
+    # quantifies the baseline's real level-violation rate. Shared with Phase D E3.
+    register_method(
+        MethodSpec(
+            name="baseline/learned_seed_goal_only",
+            mode="diffusion",
+            use_critic=False,
+            fallback_to_rule=False,
+            fallback_to_native=False,
+            report_goal_only=True,
+            description=(
+                "One-way learned (diffusion) seeds repaired to the goal with NO "
+                "level-first gate; success = goal reached, true level-violation "
+                "rate measured (B4 / E3 ablation arm)."
+            ),
+        )
+    )
 
 
 _register_defaults()
@@ -185,6 +213,9 @@ def build_seed_policy(
     metadata["compute_budget_solve_calls"] = budget
     metadata["budget_semantics"] = "compute_budget_solve_calls"
     metadata["uniform_timeout_sec"] = float(timeout_sec)
+    # B4: strip the level-first gate at the report layer for one-way-seed baselines.
+    if spec.report_goal_only:
+        metadata["report_goal_only_no_level_gate"] = True
     # Legacy field kept for backward-compat readers; now interpreted as a guard,
     # not a per-strategy tuning knob.
     metadata["total_budget_ms"] = float(timeout_sec) * 1000.0

@@ -350,8 +350,8 @@
         {
           "id": "B4",
           "description": "单向学习种子 (约等于现有 diffusion_only，且 = E3 一档)：DiffusionSeeder 式基线，实现一次，Phase D E3 复用。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "B0"
           ],
@@ -364,7 +364,8 @@
             "tools/dataset/run_closed_loop_benchmark.py",
             "level_planner_core/planner.py (仅报告模式 flag)"
           ],
-          "uncertainty": "低 (主要是 config)；数字有意义需 C 的重训 checkpoint。"
+          "uncertainty": "低 (主要是 config)；数字有意义需 C 的重训 checkpoint。",
+          "completion_note": "B4 完成 (2026-07-17)。实现为报告层 gate flag，不是新种子器：(1) methods.py 注册 baseline/learned_seed_goal_only (report_goal_only=True)，经 build_seed_policy 写入 metadata.report_goal_only_no_level_gate；(2) constraints.select_level_first_candidate 增 ignore_alignment_for_selection 分支——按连续性/路径代价选最平滑的到达目标候选(忽略 level 违约)，planning_status=success，selection_mode=goal_only_alignment_ignored，但仍记录每条候选真实 max_alignment_deviation；(3) planner.py:959 从 request.metadata 读取并透传该 flag。验证：tests/test_constraints_smoke.py 新增 test_select_level_first_candidate_goal_only_ignores_alignment (3 passed)——level-first 选 level-valid 候选(idx1,dev2°)，B4 选最平滑候选(idx0)忽略其40°违约、报 success、真实违约值完整保留。端到端 smoke 因当前 diffusion checkpoint 在 smoke 请求上无到达目标候选而与 diffusion_only 同样失败(在 flag 上游，两法一致)；有意义数字待 C 重训 checkpoint。"
         },
         {
           "id": "B5",

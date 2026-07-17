@@ -956,6 +956,9 @@ class LevelConstrainedPlanner:
             continuity,
             level_tolerance_deg=float(alignment["tolerance_deg"]),
             strict_level=bool(alignment["strict_level"]),
+            ignore_alignment_for_selection=bool(
+                request.get("metadata", {}).get("report_goal_only_no_level_gate", False)
+            ),
         )
         selected_index = int(selection.get("selected_index", 0))
         selected = positions[selected_index].detach().cpu()
