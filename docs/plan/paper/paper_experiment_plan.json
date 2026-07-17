@@ -157,8 +157,8 @@
         {
           "id": "A3",
           "description": "Benchmark harness 升级 (依赖 A1/A2 字段完整)：产出 E1 (成功率+约束误差+时间分位表) 与 E2 (Success@K vs 时间预算曲线) 所需数据。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "A1",
             "A2"
@@ -179,7 +179,8 @@
             "tools/dataset/run_closed_loop_benchmark.py",
             "tools/dataset/run_lifecycle_batch.py"
           ],
-          "uncertainty": "A3.7 方法轴接缝的模块边界须与 B0 协同设计，服务两个 runner。"
+          "uncertainty": "A3.7 方法轴接缝的模块边界须与 B0 协同设计，服务两个 runner。",
+          "implementation_note": "A3.0 决议: CuRobo solve_pose 无 wall-clock 超时且不可中途打断(仅 solve_pose 调用时参数 initial_iters/finetune_iters/finetune_attempts)。按 A3.0(b) 采用 compute-budget=允许 seed/solve 尝试数(k_generate)语义, 跨策略统一 timeout_sec 守卫(A3.0c), 成功率按 K/budget 条件化(A3.0d)。去除写死不等的 timeout_sec(rule 0.5 vs learned 2.0)。A3.1 --k-values / A3.2 --budget-values / A3.8 --seeds 扫描 method x K x budget x repeat 矩阵。A3.3 Success@K 由 candidate_records 后处理(至少一条过硬验收), 不重跑。A3.4 约束误差聚合: selected/candidate 对齐误差分布(mean/p50/p95/max)+违约率, A1 碰撞最小距离分布, A2 dimensioned jerk/motion_time 分布。A3.5 延迟补 p75+p98。A3.6 schema 升 closed_loop_curobo_benchmark.v2(加 method/K/budget 轴 + constraint_error 块 + per_problem_success_bits, 保留 strategy 别名向后兼容)。A3.7 方法轴接缝抽到 tools/dataset/methods.py(MethodSpec 注册表 + build_seed_policy/apply_config, external 位留给 Phase B)。A3.8 Wilson CI + per-problem success bits(供 McNemar 配对检验) + hardware 规格(A100)记录。端到端验证: 8 cells(2K x 2budget x 2seed), Success@K/Wilson CI/p50-p98/对齐误差分布 均正确填充; timeout 跨策略统一。"
         },
         {
           "id": "A4",
