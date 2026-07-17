@@ -131,6 +131,33 @@ def method_request(
     )
 
 
+def strategy_request(
+    request: dict[str, Any],
+    strategy: str,
+    total_budget_ms: float,
+    *,
+    k_generate: int = 1,
+    k_accept: int = 1,
+) -> dict[str, Any]:
+    """Backward-compat shim for the pre-A3 ``strategy_request`` signature (B0).
+
+    The A3 rewrite renamed this to ``method_request`` and moved the budget onto
+    the compute axis with a uniform ``timeout_sec`` guard. The old call sites
+    (and ``tests/test_phase8_artifact_and_benchmark.py``) pass a wall-clock
+    ``total_budget_ms``; we translate it to the uniform timeout guard so
+    ``metadata.total_budget_ms`` round-trips unchanged while the seed-policy
+    modes/fallbacks are produced by the same dispatch as ``method_request``.
+    """
+    return method_request(
+        request,
+        strategy,
+        k_generate=k_generate,
+        k_accept=k_accept,
+        timeout_sec=float(total_budget_ms) / 1000.0,
+        compute_budget=k_generate,
+    )
+
+
 def _candidate_alignment_deviations(result: dict[str, Any]) -> list[float]:
     """A3.4: pull real max-alignment-deviation (deg) from every candidate."""
     values: list[float] = []
@@ -475,7 +502,13 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
                                 json.dumps(req, ensure_ascii=False, indent=2) + "\n",
                                 encoding="utf-8",
                             )
-                            result = planner.plan(req, out_dir=out_dir)
+                            result = method_dispatch.run_method(
+                                method,
+                                req,
+                                planner=planner,
+                                config=config,
+                                out_dir=out_dir,
+                            )
                             skipped = False
                         elapsed_sec = time.time() - started
                         record = {

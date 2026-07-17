@@ -182,3 +182,57 @@ def apply_config(config: Any, method: str) -> Any:
     spec = get_method(method)
     config.learned_seed_use_critic = bool(spec.use_critic)
     return config
+
+
+def run_method(
+    method: str,
+    request: dict[str, Any],
+    *,
+    planner: Any,
+    config: Any,
+    out_dir: Any = None,
+    **context: Any,
+) -> dict[str, Any]:
+    """Dispatch one request through the method registry (B0 method-axis seam).
+
+    This is the single choke point that turns a *method name* into a concrete
+    ``result_dict``. It replaces the benchmark's former hard-coded
+    ``planner.plan(...)`` call so external baselines (Phase B) slot in without
+    the runner knowing anything about them:
+
+    * **Internal methods** (``ours/*`` -- the historical rule/diffusion/critic/
+      mixed strategies) run through the shared ``LevelConstrainedPlanner``
+      control flow, exactly as before.
+    * **External methods** (``spec.external is True``) must supply a ``runner``
+      callable with the contract ``runner(request, config, *, planner, out_dir,
+      **context) -> result_dict``. The ``planner`` is passed through so an
+      external baseline can borrow the CuRobo collision world / repair adapter
+      and emit ``candidate_records`` scored by the *same* hard validator (B6),
+      keeping the comparison apples-to-apples. B0 only wires the seam; no
+      external runner is registered yet.
+
+    The returned dict is expected to follow the planner result contract
+    (``request_id`` / ``status`` / ``metrics`` / ``candidate_records`` ...), so
+    the benchmark's summariser and the A4 converter treat every method
+    uniformly.
+    """
+
+    spec = get_method(method)
+    if spec.external:
+        if spec.runner is None:
+            raise ValueError(
+                f"external method {method!r} declares no runner callable; "
+                "register_method(...) must supply one"
+            )
+        return spec.runner(
+            request,
+            config,
+            planner=planner,
+            out_dir=out_dir,
+            **context,
+        )
+    if planner is None:
+        raise ValueError(
+            f"internal method {method!r} requires a planner instance; got None"
+        )
+    return planner.plan(request, out_dir=out_dir)

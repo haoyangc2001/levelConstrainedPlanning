@@ -220,8 +220,8 @@
         {
           "id": "B0",
           "description": "方法轴契约 (与 A3.7 耦合的前置)：定义『方法 = 名称 + callable(request,config)->result_dict』，把 runner 从硬编码单一 planner 改成方法注册表，不写任何外部 planner。现有 4 策略变成 ours/* 方法，外部方法并列注册。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "A3",
             "A4"
@@ -235,7 +235,8 @@
             "tools/dataset/run_closed_loop_benchmark.py",
             "level_planner_core/result_schema.py"
           ],
-          "uncertainty": "A3.7 是否作为共享模块交付，须与阶段 A 协同。"
+          "uncertainty": "A3.7 是否作为共享模块交付，须与阶段 A 协同。",
+          "implementation_note": "方法轴接缝落地在 tools/dataset/methods.py (A3.7 已建 MethodSpec 注册表, 含 external/runner 字段)。新增 methods.run_method(method, request, *, planner, config, out_dir, **context) -> result_dict 作为唯一分派入口: 内部方法(rule_only/diffusion_only/diffusion_critic/mixed_fallback = ours/* 策略)走共享 LevelConstrainedPlanner.plan 控制流不变; external=True 的方法调用其 spec.runner(request, config, *, planner, out_dir, **context)->result_dict, 并把 planner 透传下去 (外部 baseline 借用同一 CuRobo 碰撞世界/repair 适配器, 产出经同一硬验收器打分的 candidate_records, 为 B6 apples-to-apples 铺路)。run_closed_loop_benchmark.run_benchmark 的 planner.plan(...) 调用改为 method_dispatch.run_method(...), 运行器不再硬编码单一 planner。两条错误路径有明确守护(external 无 runner / internal 无 planner 均抛 ValueError)。向后兼容: A3 曾把 strategy_request 更名为 method_request, 破坏了 tests/test_phase8_artifact_and_benchmark.py 守护; 新增 strategy_request(request, strategy, total_budget_ms, *, k_generate, k_accept) 兼容 shim (把 total_budget_ms 映射为统一 timeout 守护, metadata.total_budget_ms 原样回传), 2 passed。methods.py 保持独立可被两个 runner import (run_lifecycle_batch 是单 planner 数据生成器, 无方法轴, 不需要分派)。自测: 内部分派->planner.plan, 外部分派->runner 且 planner 透传, 两条守护均触发, 全绿。B0 只建接缝, 尚未注册任何外部 runner。"
         },
         {
           "id": "B1",
