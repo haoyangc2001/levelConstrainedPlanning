@@ -28,6 +28,10 @@ from pathlib import Path
 from typing import Any
 
 from tools.dataset import methods as method_dispatch
+# Importing the baselines package registers every Phase-B external method
+# (B2 soft-cost, ...) with the dispatch registry as an import side effect, so
+# ``--strategies baseline/curobo_soft_cost`` resolves without extra wiring.
+from tools.dataset import baselines as _baselines  # noqa: F401
 from tools.dataset.run_lifecycle_batch import load_requests, request_output_dir
 
 
@@ -459,8 +463,19 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
     k_values = _parse_int_list(args.k_values)
     budget_values = _parse_int_list(args.budget_values) if args.budget_values else list(k_values)
     seeds = _parse_int_list(args.seeds) if args.seeds else [0]
+    # B2 lambda-sweep values (only applied to methods that consume
+    # metadata.soft_axis_weight). ``None`` sentinel = "do not set a weight", used
+    # for every non-soft-cost method so its cell count is not multiplied.
+    soft_axis_weights = _parse_float_list(args.soft_axis_weights) if args.soft_axis_weights else None
     tolerance_deg = float(args.tolerance_deg) if args.tolerance_deg is not None else None
     args.out_dir.mkdir(parents=True, exist_ok=True)
+
+    def _weights_for(method: str) -> list[float | None]:
+        # Only the soft-cost baseline reads the weight; sweeping it for anything
+        # else would multiply cells with identical results.
+        if method == "baseline/curobo_soft_cost" and soft_axis_weights:
+            return list(soft_axis_weights)
+        return [None]
 
     # A3.1/A3.2/A3.8: sweep method x K x budget x repeat-seed. Each (method, k,
     # budget, seed) is one benchmark *cell*. Cells sharing a method reuse one
@@ -469,90 +484,98 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
     for method in methods:
         config = _build_config(args, method)
         planner = LevelConstrainedPlanner(config)
+        method_weights = _weights_for(method)
         for k_generate in k_values:
             for budget in budget_values:
                 for seed in seeds:
-                    cell_label = f"{method}_k{k_generate}_b{budget}_s{seed}"
-                    cell_dir = args.out_dir / cell_label
-                    cell_dir.mkdir(parents=True, exist_ok=True)
-                    records: list[dict[str, Any]] = []
-                    for local_index, request in enumerate(selected):
-                        index = int(args.offset) + local_index
-                        req = method_request(
-                            request,
-                            method,
-                            k_generate=k_generate,
-                            k_accept=min(int(args.k_accept), k_generate),
-                            timeout_sec=float(args.timeout_sec),
-                            compute_budget=budget,
-                        )
-                        # A3.8: repeat seed varies the request seed_policy seed so
-                        # stochastic diffusion sampling differs across repeats.
-                        req.setdefault("seed_policy", {})["repeat_seed"] = int(seed)
-                        req["metadata"]["repeat_seed"] = int(seed)
-                        out_dir = request_output_dir(cell_dir, index, req)
-                        result_path = out_dir / "result.json"
-                        started = time.time()
-                        if args.resume and result_path.exists():
-                            result = json.loads(result_path.read_text(encoding="utf-8"))
-                            skipped = True
-                        else:
-                            out_dir.mkdir(parents=True, exist_ok=True)
-                            (out_dir / "request.json").write_text(
-                                json.dumps(req, ensure_ascii=False, indent=2) + "\n",
-                                encoding="utf-8",
-                            )
-                            result = method_dispatch.run_method(
+                    for weight in method_weights:
+                        weight_tag = "" if weight is None else f"_w{weight:g}"
+                        cell_label = f"{method}_k{k_generate}_b{budget}_s{seed}{weight_tag}"
+                        cell_dir = args.out_dir / cell_label
+                        cell_dir.mkdir(parents=True, exist_ok=True)
+                        records: list[dict[str, Any]] = []
+                        for local_index, request in enumerate(selected):
+                            index = int(args.offset) + local_index
+                            req = method_request(
+                                request,
                                 method,
-                                req,
-                                planner=planner,
-                                config=config,
-                                out_dir=out_dir,
+                                k_generate=k_generate,
+                                k_accept=min(int(args.k_accept), k_generate),
+                                timeout_sec=float(args.timeout_sec),
+                                compute_budget=budget,
                             )
-                            skipped = False
-                        elapsed_sec = time.time() - started
-                        record = {
-                            "method": method,
-                            "strategy": method,
-                            "k_generate": int(k_generate),
-                            "compute_budget_solve_calls": int(budget),
-                            "repeat_seed": int(seed),
-                            "index": int(index),
-                            "request_id": result.get("request_id"),
-                            "out_dir": str(out_dir),
-                            "status": result.get("status"),
-                            "failure_reason": result.get("failure_reason"),
-                            "success_source": (result.get("metrics") or {}).get("success_source"),
-                            "selected_candidate_id": (result.get("metrics") or {}).get("selected_candidate_id"),
-                            "elapsed_sec": round(float(elapsed_sec), 6),
-                            "skipped": bool(skipped),
-                            "result": result,
-                        }
-                        records.append(record)
-                        if args.progress:
-                            print(
-                                json.dumps(
-                                    {
-                                        "cell": cell_label,
-                                        "index": index,
-                                        "status": record["status"],
-                                        "success_source": record["success_source"],
-                                        "out_dir": str(out_dir),
-                                    },
-                                    ensure_ascii=False,
-                                ),
-                                flush=True,
-                            )
-                    cells.append(
-                        {
-                            "label": cell_label,
-                            "method": method,
-                            "k_generate": int(k_generate),
-                            "compute_budget_solve_calls": int(budget),
-                            "repeat_seed": int(seed),
-                            "records": records,
-                        }
-                    )
+                            # A3.8: repeat seed varies the request seed_policy seed so
+                            # stochastic diffusion sampling differs across repeats.
+                            req.setdefault("seed_policy", {})["repeat_seed"] = int(seed)
+                            req["metadata"]["repeat_seed"] = int(seed)
+                            # B2: inject the swept soft-cost lambda for this cell.
+                            if weight is not None:
+                                req["metadata"]["soft_axis_weight"] = float(weight)
+                            out_dir = request_output_dir(cell_dir, index, req)
+                            result_path = out_dir / "result.json"
+                            started = time.time()
+                            if args.resume and result_path.exists():
+                                result = json.loads(result_path.read_text(encoding="utf-8"))
+                                skipped = True
+                            else:
+                                out_dir.mkdir(parents=True, exist_ok=True)
+                                (out_dir / "request.json").write_text(
+                                    json.dumps(req, ensure_ascii=False, indent=2) + "\n",
+                                    encoding="utf-8",
+                                )
+                                result = method_dispatch.run_method(
+                                    method,
+                                    req,
+                                    planner=planner,
+                                    config=config,
+                                    out_dir=out_dir,
+                                )
+                                skipped = False
+                            elapsed_sec = time.time() - started
+                            record = {
+                                "method": method,
+                                "strategy": method,
+                                "k_generate": int(k_generate),
+                                "compute_budget_solve_calls": int(budget),
+                                "repeat_seed": int(seed),
+                                "soft_axis_weight": (float(weight) if weight is not None else None),
+                                "index": int(index),
+                                "request_id": result.get("request_id"),
+                                "out_dir": str(out_dir),
+                                "status": result.get("status"),
+                                "failure_reason": result.get("failure_reason"),
+                                "success_source": (result.get("metrics") or {}).get("success_source"),
+                                "selected_candidate_id": (result.get("metrics") or {}).get("selected_candidate_id"),
+                                "elapsed_sec": round(float(elapsed_sec), 6),
+                                "skipped": bool(skipped),
+                                "result": result,
+                            }
+                            records.append(record)
+                            if args.progress:
+                                print(
+                                    json.dumps(
+                                        {
+                                            "cell": cell_label,
+                                            "index": index,
+                                            "status": record["status"],
+                                            "success_source": record["success_source"],
+                                            "out_dir": str(out_dir),
+                                        },
+                                        ensure_ascii=False,
+                                    ),
+                                    flush=True,
+                                )
+                        cells.append(
+                            {
+                                "label": cell_label,
+                                "method": method,
+                                "k_generate": int(k_generate),
+                                "compute_budget_solve_calls": int(budget),
+                                "repeat_seed": int(seed),
+                                "soft_axis_weight": (float(weight) if weight is not None else None),
+                                "records": records,
+                            }
+                        )
 
     summaries = [
         _summarize_strategy(
@@ -562,7 +585,11 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
             compute_budget=cell["compute_budget_solve_calls"],
             tolerance_deg=tolerance_deg,
         )
-        | {"label": cell["label"], "repeat_seed": cell["repeat_seed"]}
+        | {
+            "label": cell["label"],
+            "repeat_seed": cell["repeat_seed"],
+            "soft_axis_weight": cell.get("soft_axis_weight"),
+        }
         for cell in cells
     ]
     report = {
@@ -608,6 +635,12 @@ def _parse_int_list(spec: str | None) -> list[int]:
     if spec is None:
         return []
     return [int(item.strip()) for item in str(spec).split(",") if item.strip()]
+
+
+def _parse_float_list(spec: str | None) -> list[float]:
+    if spec is None:
+        return []
+    return [float(item.strip()) for item in str(spec).split(",") if item.strip()]
 
 
 def _write_markdown_report(report: dict[str, Any], out: Path) -> None:
@@ -695,6 +728,16 @@ def main(argv: list[str] | None = None) -> int:
         "--seeds",
         default=None,
         help="Comma-separated repeat seeds (>=1) for statistical repeats (A3.8); default 0.",
+    )
+    # B2: soft-cost lambda-sweep axis. Each weight becomes an extra cell dimension
+    # (only meaningful for methods that read metadata.soft_axis_weight, i.e.
+    # baseline/curobo_soft_cost); other methods ignore it, so a single default is
+    # used to avoid needlessly multiplying their cells.
+    parser.add_argument(
+        "--soft-axis-weights",
+        default=None,
+        help="Comma-separated soft-cost lambda values for baseline/curobo_soft_cost "
+        "(B2 alignment-violation-vs-lambda curve); ignored by other methods.",
     )
     # Deprecated: budget is now a compute budget, not wall-clock ms (A3.0).
     parser.add_argument(

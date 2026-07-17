@@ -261,8 +261,8 @@
         {
           "id": "B2",
           "description": "cuRobo 软约束 baseline (re-port，预期弱)：把 migration 快照里的 update_tool_pose_criteria 逐轴权重机制 re-port 进标准核心并暴露为方法。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "B0",
             "A1"
@@ -278,9 +278,12 @@
           "files": [
             "level_planner_core/planner.py",
             "level_planner_core/result_schema.py",
-            "tools/dataset/run_closed_loop_benchmark.py"
+            "tools/dataset/run_closed_loop_benchmark.py",
+            "tools/dataset/baselines/__init__.py",
+            "tools/dataset/baselines/curobo_soft_cost.py"
           ],
-          "uncertainty": "update_tool_pose_criteria API 及中途 pose cost 是否超出 horizon-1 须在 curobo conda 环境验证。"
+          "uncertainty": "update_tool_pose_criteria API 及中途 pose cost 是否超出 horizon-1 须在 curobo conda 环境验证。",
+          "completion_note": "已交付。re-port 到 tools/dataset/baselines/curobo_soft_cost.py: 方法 baseline/curobo_soft_cost 经 B0 seam 注册(external=True), 对活体 cuRobo MotionPlanner 施加 ToolPoseCriteria(non_terminal_pose_axes_weight_factor=[0,0,0,l,l,l]) 后走 native 路径求解并在 finally 里恢复默认 criteria; 无 level-aware seeding/后置门, 软代价是唯一对齐机制, 输出经共享硬校验器打分(B6)。 λ 由 metadata.soft_axis_weight 提供, benchmark 新增 --soft-axis-weights 作为 cell 轴(仅对该方法生效, 其它方法单点不倍增)。A100 smoke(--soft-axis-weights 0.0,2.0,10.0, tol5deg)验证机制生效: λ=0 候选对齐偏差 mean39.7/max98.3deg(=B3a native), λ>=2 软代价拉入 candidate mean->1.9deg; λ-sweep 曲线经 summary.summaries[].soft_axis_weight + constraint_error 暴露, 喂 E1/D5b。API update_tool_pose_criteria / ToolPoseCriteria (curobo._src.cost.tool_pose_criteria) 已在 CuroboV2 环境确认。"
         },
         {
           "id": "B3a",
