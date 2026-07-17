@@ -96,7 +96,7 @@
         "确认 MotionPlanner.plan_pose 不直接接受 seed_traj，需封装 planner.trajopt_solver.solve_pose(seed_traj=...)。",
         "常量手工 seed spike 可进入 TrajOptSolverResult 并返回插值轨迹；native trajectory 作为外部 seed 回灌 repair 成功。",
         "seed_traj 形状冻结为 [batch, n, action_horizon, dof]，SR5 单任务单 seed 为 [1, 1, H, 6]。",
-        "结论记录在 docs/plan/seed_repair_api_notes.md。"
+        "结论记录在 docs/plan/closed_loop_impl/seed_repair_api_notes.md。"
       ]
     },
     {
@@ -181,9 +181,9 @@
         }
       ],
       "deliverables": [
-        "docs/plan/closed_loop_schema_contract.json 或等价 schema 文档",
-        "docs/plan/seed_repair_api_notes.md 或 JSON 结论",
-        "docs/plan/rule_seed_migration_inventory.json"
+        "docs/plan/closed_loop_impl/closed_loop_schema_contract.json 或等价 schema 文档",
+        "docs/plan/closed_loop_impl/seed_repair_api_notes.md 或 JSON 结论",
+        "docs/plan/closed_loop_impl/rule_seed_migration_inventory.json"
       ],
       "exit_criteria": [
         "外部 seed repair 技术路线已明确。",
@@ -191,15 +191,15 @@
         "规则种子迁移边界清晰，不会引入产品栈依赖。"
       ],
       "actual_outputs": [
-        "docs/plan/closed_loop_schema_contract.json",
-        "docs/plan/seed_repair_api_notes.md",
-        "docs/plan/rule_seed_migration_inventory.json",
+        "docs/plan/closed_loop_impl/closed_loop_schema_contract.json",
+        "docs/plan/closed_loop_impl/seed_repair_api_notes.md",
+        "docs/plan/closed_loop_impl/rule_seed_migration_inventory.json",
         "runs/phase0_seed_repair_spike/report.json",
         "runs/phase0_seed_repair_spike/native_seed_report.json"
       ],
       "verification": [
-        "python3 -m json.tool docs/plan/closed_loop_schema_contract.json",
-        "python3 -m json.tool docs/plan/rule_seed_migration_inventory.json",
+        "python3 -m json.tool docs/plan/closed_loop_impl/closed_loop_schema_contract.json",
+        "python3 -m json.tool docs/plan/closed_loop_impl/rule_seed_migration_inventory.json",
         "CuRobo V2 introspection confirmed TrajOptSolver.solve_pose(seed_traj=...) signature.",
         "Phase 0 live spike confirmed native-plan external seed repair_success=true."
       ]
