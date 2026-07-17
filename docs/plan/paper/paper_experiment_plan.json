@@ -185,8 +185,8 @@
         {
           "id": "A4",
           "description": "统一论文级结果格式 (与 A3 共演化，A1/A2 字段定后定稿)：一份所有实验 (E1-E4)、所有方法 (我们+baseline) 都产出的规范记录，让表/图统一生成。是阶段 B baseline 必须遵守的契约，故规格要早定。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "A1",
             "A2"
@@ -200,7 +200,8 @@
           "files": [
             "tools/dataset/ (新增 paper_result schema + 转换器 + 图表生成器)"
           ],
-          "uncertainty": "A4.1 字段须在 A1/A2 落地后定稿 (collision/motion_quality 字段来自它们)。"
+          "uncertainty": "A4.1 字段须在 A1/A2 落地后定稿 (collision/motion_quality 字段来自它们)。",
+          "implementation_note": "新增 tools/dataset/paper_result.py + paper_charts.py。A4.1 PaperResult 数据类 == paper_result.v1: identity/条件轴(method, experiment E1-E4, constraint_class LP/LPO/PP/PPO, obstacle_density, obstacle_topology, K, budget, budget_semantics additive|fixed|compute, seed, n_problems, n_seeds) + 主结果(success_rate + success_rate_ci{wilson_lo,wilson_hi,z}, success_at_k + ci, per_problem_success 逐问题成功位) + hardware{gpu,cpu,ram} + constraint_error(含 alignment_violation_rate) + collision{min_distance 分布, collision_rate_candidate} + latency{p50,p75,p95,p98,mean} + motion_quality{max_jerk,max_accel,mean_vel,motion_time} + diversity + reconfiguration_count。评审新增字段全部落位(Wilson CI/per_problem/n_seeds+seed/hardware/p75/obstacle_topology/reconfiguration_count/budget_semantics)。A4.2 from_benchmark_report: v2 benchmark -> paper_result.v1 行(每 cell 一行), 复用 harness Wilson CI 否则重算, 透传 per-problem 成功位; CLI paper_result.py。A4.3 paper_charts.py: success_at_k_curve(Fig.4 数据, 按 method 分组 x K, 带 Wilson CI 误差带, 跨种子取 CI 包络) + main_results_table(Markdown) + 可选 matplotlib PNG(缺失则优雅降级为 JSON+MD)。副带修复(A2 契约): run_closed_loop_benchmark._motion_quality 之前读错字段名(max_abs_jerk)导致 jerk 分布恒空; 改读 A2 真实字段 max_jerk_rad_s3/max_acceleration_rad_s2/max_velocity_rad_s, 并补 accel/vel 分布。端到端验证(A100, 2 problems): benchmark v2 -> paper_result.v1(1 行, 全字段填充, jerk count=3, collision_rate_candidate=0.636 有界) -> Fig.4 曲线 JSON + 主表 Markdown。契约稳定, 供 Phase B baseline 遵守。"
         }
       ]
     },

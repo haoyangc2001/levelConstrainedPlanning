@@ -180,21 +180,29 @@ def _min_collision_distances(result: dict[str, Any]) -> list[float]:
 
 
 def _motion_quality(result: dict[str, Any]) -> dict[str, list[float]]:
-    """A3.4: aggregate A2 dimensioned jerk / motion_time from candidates."""
-    jerk: list[float] = []
-    motion_time: list[float] = []
+    """A3.4: aggregate A2 dimensioned jerk / accel / velocity / motion_time.
+
+    Reads the field names actually emitted by the A2 dimensioned validator
+    (``max_jerk_rad_s3`` etc., see ``validators.evaluate_velocity_acceleration_proxy``);
+    only candidates whose ``velocity_acceleration`` check is ``dimensioned`` (dt
+    known) contribute, so proxy-only records never pollute the distributions.
+    """
+    pools: dict[str, list[float]] = {
+        "max_jerk_rad_s3": [],
+        "max_acceleration_rad_s2": [],
+        "max_velocity_rad_s": [],
+        "motion_time_sec": [],
+    }
     for candidate in result.get("candidate_records") or []:
         checks = (candidate.get("validator_metrics") or {}).get("checks") or {}
         va = checks.get("velocity_acceleration") or {}
         if not va.get("dimensioned"):
             continue
-        jmax = va.get("max_abs_jerk")
-        mt = va.get("motion_time_sec")
-        if isinstance(jmax, (int, float)) and math.isfinite(float(jmax)):
-            jerk.append(float(jmax))
-        if isinstance(mt, (int, float)) and math.isfinite(float(mt)):
-            motion_time.append(float(mt))
-    return {"max_abs_jerk": jerk, "motion_time_sec": motion_time}
+        for key in pools:
+            value = va.get(key)
+            if isinstance(value, (int, float)) and math.isfinite(float(value)):
+                pools[key].append(float(value))
+    return pools
 
 
 def _distribution(values: list[float]) -> dict[str, float | int | None]:
@@ -297,6 +305,8 @@ def _summarize_strategy(
     candidate_align_devs: list[float] = []
     collision_min_dists: list[float] = []
     jerk_values: list[float] = []
+    accel_values: list[float] = []
+    velocity_values: list[float] = []
     motion_time_values: list[float] = []
     for record in records:
         result = record.get("result") or {}
@@ -325,7 +335,9 @@ def _summarize_strategy(
         candidate_align_devs.extend(_candidate_alignment_deviations(result))
         collision_min_dists.extend(_min_collision_distances(result))
         mq = _motion_quality(result)
-        jerk_values.extend(mq["max_abs_jerk"])
+        jerk_values.extend(mq["max_jerk_rad_s3"])
+        accel_values.extend(mq["max_acceleration_rad_s2"])
+        velocity_values.extend(mq["max_velocity_rad_s"])
         motion_time_values.extend(mq["motion_time_sec"])
     for key, value in validator_failures.items():
         if "joint_limit" in key:
@@ -370,7 +382,9 @@ def _summarize_strategy(
             "alignment_tolerance_deg": tolerance_deg,
             "alignment_violation_rate": violation_rate,
             "collision_min_distance_m": _distribution(collision_min_dists),
-            "max_abs_jerk": _distribution(jerk_values),
+            "max_jerk_rad_s3": _distribution(jerk_values),
+            "max_acceleration_rad_s2": _distribution(accel_values),
+            "max_velocity_rad_s": _distribution(velocity_values),
             "motion_time_sec": _distribution(motion_time_values),
         },
         # A3.8: per-problem success bits (index-aligned across methods/repeats).
