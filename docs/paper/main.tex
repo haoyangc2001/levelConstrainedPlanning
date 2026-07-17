@@ -1,0 +1,171 @@
+%% ============================================================================
+%% SR5 Level-Constrained Planning -- conference paper (IEEE conference format)
+%%
+%% Target venue: IEEE ICRA / IROS (IEEEtran conference style, US-letter, 2-column).
+%% The IEEEtran class + BibTeX style live under ./IEEEtran/ (official CTAN package).
+%%
+%% Build:  see README.md in this directory (latexmk -pdf main.tex).
+%% ============================================================================
+\documentclass[conference]{IEEEtran/IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote.
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{subcaption}
+
+% hyperref should be loaded last.
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{figures/}}
+
+% Convenience macros for constrained-planning notation.
+\newcommand{\qvec}{\mathbf{q}}
+\newcommand{\Tgoal}{T_{\text{goal}}}
+\newcommand{\zee}{z_{\text{ee}}}
+\newcommand{\zw}{z_{w}}
+
+\begin{document}
+
+\title{Level-Constrained Trajectory Planning for Manipulators\\
+via Seed Construction, CuRobo Repair, and a Closed-Loop\\
+Learning--Optimization System\\
+\thanks{This work was carried out on the SR5 manipulator platform.
+Corresponding author: (email).}}
+
+\author{\IEEEauthorblockN{First Author}
+\IEEEauthorblockA{\textit{Affiliation} \\
+\textit{Institution}\\
+City, Country \\
+email@domain}
+\and
+\IEEEauthorblockN{Second Author}
+\IEEEauthorblockA{\textit{Affiliation} \\
+\textit{Institution}\\
+City, Country \\
+email@domain}
+}
+
+\maketitle
+
+\begin{abstract}
+Keeping a manipulator's end effector level throughout an entire path---the
+``carrying a tray of water'' constraint---turns point-to-point planning into
+motion on a low-dimensional constraint manifold, where feasible solutions are
+scarce and gradient-based optimizers are highly sensitive to their initial
+seed. We present a level-constrained trajectory planning system for the SR5
+manipulator that (i) constructs a diverse family of rule-based level-preserving
+seeds via horizontal-pose interpolation and branch-consistent inverse
+kinematics, (ii) repairs and refines every seed with GPU-batched CuRobo
+trajectory optimization, and (iii) selects the executable trajectory with a
+level-first hard validator. We further wrap this planner in a closed-loop
+learning--optimization system---\emph{data generation, model learning,
+optimization validation, failure fallback, data update}---in which a diffusion
+seed model and a success critic learn the distribution of CuRobo-repairable
+seeds, while every learned candidate still returns to CuRobo repair, hard
+validation, and rule-based fallback. We report the constrained-planning success
+rate under a fixed time budget and analyze the contribution of each component.
+\end{abstract}
+
+\begin{IEEEkeywords}
+constrained motion planning, manipulation, trajectory optimization, diffusion
+models, inverse kinematics, learning for planning
+\end{IEEEkeywords}
+
+\section{Introduction}
+\label{sec:intro}
+% Motivation: end-effector level (orientation-path) constraint; "carry water" tasks
+% (trays, welding, spraying, polishing). Distinguish from point-to-point planning.
+% Contribution list:
+%  1) A multi-family rule-based level seed constructor with branch-consistent IK.
+%  2) A CuRobo repair + level-first hard-validation pipeline.
+%  3) A closed-loop learning--optimization system that treats every candidate
+%     (success, failed seed, fallback recovery) as first-class training data.
+Placeholder.
+
+\section{Related Work}
+\label{sec:related}
+% Sampling-based constrained planning (TSR/CBiRRT, OMPL constrained, cpRRTC, McVAMP).
+% IK-based methods (IKFast, TRAC-IK, RelaxedIK, IKFlow).
+% Trajectory optimization (CHOMP, STOMP, TrajOpt, GPMP, CuRobo).
+% Learning-based seeding (DiffusionSeeder, Motion Planning Diffusion, PRESTO).
+Placeholder.
+
+\section{Problem Formulation}
+\label{sec:problem}
+% Trajectory as (N+1) x n joint-configuration sequence P = [q_0, ..., q_N].
+% Objective: smoothness (velocity/acceleration/jerk) + regularization.
+% Constraints: start q_0 = q_start; goal T_ee(q_N) = T_goal;
+%   level path constraint z_ee(q_k)^T z_w >= cos(eps) for all k;
+%   joint limits; velocity/acceleration; collision d(q_k, O) >= d_safe;
+%   joint-space continuity ||q_{k+1} - q_k|| <= dq_max.
+The level constraint at each waypoint is expressed as
+\begin{equation}
+  \zee(\qvec_k)^\top \zw \ge \cos\epsilon, \qquad k = 0,1,\dots,N,
+  \label{eq:level}
+\end{equation}
+where $\zee(\qvec_k)$ is the tool axis and $\zw$ the target world direction.
+
+\section{Method}
+\label{sec:method}
+
+\subsection{Multi-Family Level Seed Construction}
+\label{sec:seeds}
+% Cartesian linear interpolation of position; pose restricted to the horizontal
+% family via goal-relative twist interpolation Q_i = Q_g * T_y(theta_i);
+% branch-consistent IK selection minimizing joint jump + trend + goal-anchor +
+% limit-margin costs; smoothed / bridged variants; segmented optimization.
+
+\subsection{CuRobo Repair and Hard Validation}
+\label{sec:repair}
+% Seeds enter trajopt_solver.solve_pose(seed_traj=...); level-first candidate
+% selection ranks by alignment validity, start-gap, joint-step jump, twist
+% smoothness, path cost; hard validator checks alignment/goal/continuity/
+% joint-limit/velocity-acceleration.
+
+\subsection{Closed-Loop Learning--Optimization System}
+\label{sec:closedloop}
+% Diffusion seed model learns p(tau_seed | q_s, T_g, O, C); success critic
+% predicts (P_success, alignment risk, collision risk, opt cost); every learned
+% candidate returns to CuRobo repair + hard validation; failures fall back to
+% rule seeds; all outcomes feed the next dataset version.
+
+\section{Experiments}
+\label{sec:experiments}
+% Main metric: success rate after CuRobo repair + hard validation under a fixed
+% total time budget. Ablations: rule-only vs diffusion-only vs diffusion+critic
+% vs mixed fallback. Report SR5 real-robot and simulation stress tests.
+
+\begin{table}[t]
+\caption{Constrained-planning success rate (placeholder).}
+\label{tab:main}
+\centering
+\begin{tabular}{lcc}
+\toprule
+Method & Success rate & Mean solve time (s) \\
+\midrule
+CuRobo native (no seed) & -- & -- \\
+Rule seeds + CuRobo + selection & -- & -- \\
+Diffusion seeds only & -- & -- \\
+Diffusion + critic & -- & -- \\
+Mixed fallback & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Conclusion}
+\label{sec:conclusion}
+Placeholder.
+
+\section*{Acknowledgment}
+Placeholder.
+
+\bibliographystyle{IEEEtran/bibtex/IEEEtran}
+\bibliography{references}
+
+\end{document}
