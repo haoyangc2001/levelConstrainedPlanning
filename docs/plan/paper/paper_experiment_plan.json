@@ -284,8 +284,8 @@
         {
           "id": "B3a",
           "description": "cuRobo 原生无约束下限 (近乎免费)：把 planner_native 单独暴露为 baseline/curobo_native_unconstrained，由硬验收门量出其 (预期高的) 对齐违约。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "B0"
           ],
@@ -297,7 +297,8 @@
             "tools/dataset/run_closed_loop_benchmark.py",
             "level_planner_core/planner.py"
           ],
-          "uncertainty": "低——复用现有 planner_native 路径，只需干净的方法包装。"
+          "uncertainty": "低——复用现有 planner_native 路径，只需干净的方法包装。",
+          "completion_note": "methods.py 注册 baseline/curobo_native_unconstrained (mode=native, fallback_to_rule=False, fallback_to_native=True, external=False)。mode=native 既非 learned 也非 rule，_plan_with_control_flow 直落 planner_native 分支 (self._planner.plan_pose(goal,...))，对水平轴无约束。A100 冒烟 (2 problems, K=4): final_success_rate=0.5，候选级 alignment 偏差 mean=39.7° max=98.3° (远超 5° 容差)，经同一硬验收门量出——即无约束下限的强 strawman 信号。latency p50/p75/p95/p98、Wilson CI、per_problem_success_bits 均正常填充。"
         },
         {
           "id": "B3b",

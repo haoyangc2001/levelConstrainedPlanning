@@ -105,6 +105,25 @@ def _register_defaults() -> None:
             description="Diffusion+critic with rule and native fallback (deployment mode).",
         )
     )
+    # B3a: cuRobo native unconstrained lower bound. mode="native" is neither a
+    # learned mode nor "rule", so _plan_with_control_flow falls straight through
+    # to the planner_native branch (self._planner.plan_pose(goal, ...)), which
+    # solves to the goal *pose* with NO level-axis constraint. The shared hard
+    # validator then measures its (expected high) alignment violation. This is an
+    # internal method (reuses the planner control flow), not an external runner.
+    register_method(
+        MethodSpec(
+            name="baseline/curobo_native_unconstrained",
+            mode="native",
+            use_critic=False,
+            fallback_to_rule=False,
+            fallback_to_native=True,
+            description=(
+                "cuRobo native motion generation to the goal pose, no level-axis "
+                "constraint (B3a unconstrained lower bound / strawman floor)."
+            ),
+        )
+    )
 
 
 _register_defaults()
