@@ -241,8 +241,8 @@
         {
           "id": "B1",
           "description": "开源调研 + 借用/复现决策 (纯文档，可立即开始，不依赖 A)：读 docs/paper/referpaper/ 的 cpRRTC/McVAMP/VAMP/pRRTC PDF，产出『方法->{开源可得?/许可/SR5-URDF+碰撞世界桥接成本/借用 vs 复现}』决策表，喂 B3b/B5 定 scope。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [],
           "details": [
             "注意 referpaper/README 标注 OMPL 约束规划无 arXiv、需从 venue 引。",
@@ -255,7 +255,8 @@
             "docs/paper/referpaper/*.pdf (只读)",
             "docs/plan/"
           ],
-          "uncertainty": "外部仓库可得性无法从本仓库判断，B1 主要是文献 + 成本推理。"
+          "uncertainty": "外部仓库可得性无法从本仓库判断，B1 主要是文献 + 成本推理。",
+          "completion_note": "产出 docs/plan/paper/B1_baseline_survey.md (208 行)：(0) 约束 c(q)=angle(R(q)·local_axis, target_world_axis)-tol<=0 的桥接定义，锚定 planner.py:596-601 / constraints.py:275-316；(1) 决策矩阵：OMPL 投影=B5 主借用(中等桥接)，GPMP2/CHOMP=B3c，cpRRTC/McVAMP/VAMP/pRRTC=仅引用(robot+world 编译期写死，桥接=移植)；(2) 风险姿态：B5 或 B3c 至少一个必交付；(3) B5 最小可行路径：OMPL 借用(§3a) 或最小切空间投影规划器(§3b, 无外部依赖)；(4) B3c 保底：最小 CHOMP-with-constraint 复现(§4b, 纯 torch 无依赖)作为真正安全网，GPMP2 借用(§4a)为可选增强。§3b/§4b 共享已有的 (autodiff c(q) 梯度 / A1 碰撞查询 / dt 重采样) 三要素，故约束强制型对手不因借用失败而全灭。注意：授权时 web/repo 实时校验不可用(搜索后端 503)，矩阵中 repo URL/许可证均标 [verify] 待核；但借用 vs 复现决策与最小可行路径不依赖该校验。"
         },
         {
           "id": "B2",
