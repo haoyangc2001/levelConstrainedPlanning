@@ -134,8 +134,8 @@
         {
           "id": "A2",
           "description": "真实时间参数化 (与 A1 并行，独立)：让 velocity/accel/jerk 从无量纲 proxy 变成 rad/s、rad/s^2、rad/s^3，与文献 (cuRobo max jerk/accel、motion time) 可比。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [],
           "details": [
             "A2.1 定位 solve_pose 结果里的 dt / interpolation_dt。",
@@ -151,7 +151,8 @@
             "level_planner_core/validators.py",
             "level_planner_core/result_schema.py"
           ],
-          "uncertainty": "dt/interpolation_dt 是否在 solve_pose 输出中可得，须在 curobo 环境确认。"
+          "uncertainty": "dt/interpolation_dt 是否在 solve_pose 输出中可得，须在 curobo 环境确认。",
+          "completion_note": "A2.1 已确认：solve_pose 结果的 interpolated JointState 携带 dt 张量 (0.025s=40Hz)，且 trajopt result 暴露 maximum_trajectory_dt/minimum_trajectory_dt；CuRobo 直接产出有量纲 v/a/jerk，故 A2.5 (TOPP-RA 兜底) 无需实现。 A2.2 repair.py 新增 _extract_interpolation_dt，把 interpolation_dt_sec 写入 optimizer_result；planner-native 路径同样新增 _extract_interpolation_dt 并写入 summary.optimizer_result。 A2.3 evaluate_velocity_acceleration_proxy 升级：接受 dt_sec，dt 可得时输出 rad/s, rad/s^2, rad/s^3 与 motion_time_sec=(n-1)*dt 并置 dimensioned=True；dt=None 时保留无量纲 proxy 并置 dimensioned=False 明确标注。 A2.4 evaluate_hard_constraints 新增 dt_sec 透传，planner 两个调用点从 summary.optimizer_result.interpolation_dt_sec 取值。 端到端验证：4 个 native 候选全部 dt=0.025, dimensioned=True, motion_time=3.0s, vmax~1.8-2.7 rad/s, amax~2.5-8.4 rad/s^2, jmax~58-130 rad/s^3；dt=None 回退路径 dimensioned=False 且仍 valid。"
         },
         {
           "id": "A3",

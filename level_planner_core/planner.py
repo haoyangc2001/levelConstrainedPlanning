@@ -890,6 +890,11 @@ class LevelConstrainedPlanner:
                     summary["status"] = "success"
                     summary["trajectory_shape"] = list(trajectory.shape)
                     summary["trajectory_path"] = ""
+                    dt_native = self._extract_interpolation_dt(result)
+                    if dt_native is not None:
+                        opt = dict(summary.get("optimizer_result") or {})
+                        opt["interpolation_dt_sec"] = dt_native
+                        summary["optimizer_result"] = opt
                 else:
                     summary["status"] = "failed_planner"
                     summary["failure_reason"] = self._result_status(result)
@@ -1246,6 +1251,7 @@ class LevelConstrainedPlanner:
             world_summary=self._world_summary,
             thresholds=self._validator_thresholds(),
             collision_result=self._evaluate_collision(trajectory_points),
+            dt_sec=(summary.get("optimizer_result") or {}).get("interpolation_dt_sec"),
         )
         validator_valid = bool(validator_metrics.get("valid"))
         if optimizer_success and not validator_valid:
@@ -1495,6 +1501,38 @@ class LevelConstrainedPlanner:
         if result is None:
             return "planner_returned_none"
         return str(getattr(result, "status", "unknown"))
+
+    @staticmethod
+    def _extract_interpolation_dt(result) -> float | None:
+        """Interpolation timestep (s) of a plan result; None if unavailable.
+
+        Mirrors ``repair._extract_interpolation_dt`` for the planner-native path
+        (A2). Prefers the interpolated JointState ``dt`` tensor, falling back to
+        the solver ``maximum_trajectory_dt`` scalar.
+        """
+        try:
+            plan = result.get_interpolated_plan()
+        except Exception:
+            plan = None
+        dt = getattr(plan, "dt", None) if plan is not None else None
+        if dt is not None:
+            try:
+                if hasattr(dt, "detach"):
+                    flat = dt.detach().cpu().reshape(-1)
+                    if int(flat.numel()) > 0:
+                        return float(flat[0].item())
+                else:
+                    return float(dt)
+            except Exception:
+                pass
+        for attr in ("maximum_trajectory_dt", "minimum_trajectory_dt", "interpolation_dt"):
+            value = getattr(result, attr, None)
+            if value is not None:
+                try:
+                    return float(value.item()) if hasattr(value, "item") else float(value)
+                except Exception:
+                    continue
+        return None
 
     def _write_artifacts(self, result: PlannerResult, out_dir: str | Path) -> None:
         out_path = Path(out_dir)

@@ -73,6 +73,7 @@ def evaluate_hard_constraints(
     world_summary: dict[str, Any] | None = None,
     thresholds: dict[str, float] | None = None,
     collision_result: dict[str, Any] | None = None,
+    dt_sec: float | None = None,
 ) -> dict[str, Any]:
     """Evaluate all currently available hard validation checks.
 
@@ -87,7 +88,7 @@ def evaluate_hard_constraints(
     goal = _evaluate_goal(metrics, active)
     continuity = _evaluate_continuity(trajectory_points, start_joint, active)
     joint_limit = evaluate_joint_limits(trajectory_points, joint_limits)
-    velocity_acceleration = evaluate_velocity_acceleration_proxy(trajectory_points, active)
+    velocity_acceleration = evaluate_velocity_acceleration_proxy(trajectory_points, active, dt_sec)
     collision_safety = _evaluate_collision(collision_result, active, world_summary)
     optimizer = {
         "success": bool(optimizer_success),
@@ -263,7 +264,16 @@ def evaluate_joint_limits(
 def evaluate_velocity_acceleration_proxy(
     trajectory_points: list[list[float]],
     thresholds: dict[str, float] | None = None,
+    dt_sec: float | None = None,
 ) -> dict[str, Any]:
+    """Evaluate motion-quality limits.
+
+    When ``dt_sec`` (interpolation timestep, seconds) is available the metrics are
+    *dimensioned*: velocity rad/s, acceleration rad/s^2, jerk rad/s^3, and
+    ``motion_time_sec = (n - 1) * dt``. This is comparable to cuRobo/literature
+    max jerk/accel and motion time (A2 hard exit). When ``dt_sec`` is None we fall
+    back to the dimensionless per-step proxy and explicitly flag ``dt_sec: null``.
+    """
     active = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
     if len(trajectory_points) < 2:
         return {
@@ -271,36 +281,82 @@ def evaluate_velocity_acceleration_proxy(
             "status": "not_enough_points",
             "max_velocity_proxy_l2": 0.0,
             "max_acceleration_proxy_l2": 0.0,
+            "dimensioned": bool(dt_sec),
+            "dt_sec": float(dt_sec) if dt_sec else None,
+            "motion_time_sec": 0.0,
             "failure_reason": None,
         }
     points = torch.tensor(trajectory_points, dtype=torch.float32)
-    velocity = points[1:] - points[:-1]
-    velocity_l2 = torch.linalg.norm(velocity, dim=-1)
-    if int(velocity.shape[0]) >= 2:
-        acceleration = velocity[1:] - velocity[:-1]
-        acceleration_l2 = torch.linalg.norm(acceleration, dim=-1)
-        max_acceleration = float(torch.max(acceleration_l2).item())
+    step = points[1:] - points[:-1]
+    step_l2 = torch.linalg.norm(step, dim=-1)
+    max_step = float(torch.max(step_l2).item())
+    if int(step.shape[0]) >= 2:
+        accel_step = step[1:] - step[:-1]
+        max_accel_step = float(torch.max(torch.linalg.norm(accel_step, dim=-1)).item())
     else:
-        max_acceleration = 0.0
-    max_velocity = float(torch.max(velocity_l2).item())
-    valid = max_velocity <= float(active["max_joint_step_l2"]) and max_acceleration <= float(
+        accel_step = None
+        max_accel_step = 0.0
+
+    result: dict[str, Any] = {
+        "max_velocity_proxy_l2": round(max_step, 8),
+        "max_acceleration_proxy_l2": round(max_accel_step, 8),
+        "velocity_proxy_threshold_l2": float(active["max_joint_step_l2"]),
+        "acceleration_proxy_threshold_l2": float(active["max_acceleration_proxy_l2"]),
+    }
+
+    if dt_sec and float(dt_sec) > 0.0:
+        dt = float(dt_sec)
+        n = int(points.shape[0])
+        motion_time = (n - 1) * dt
+        # Dimensioned per-joint finite differences.
+        velocity = step / dt  # rad/s
+        max_velocity = float(torch.max(torch.abs(velocity)).item())
+        if accel_step is not None:
+            acceleration = accel_step / (dt * dt)  # rad/s^2
+            max_acceleration = float(torch.max(torch.abs(acceleration)).item())
+            if int(acceleration.shape[0]) >= 2:
+                jerk = (acceleration[1:] - acceleration[:-1]) / dt  # rad/s^3
+                max_jerk = float(torch.max(torch.abs(jerk)).item())
+            else:
+                max_jerk = 0.0
+        else:
+            max_acceleration = 0.0
+            max_jerk = 0.0
+        result.update(
+            {
+                "valid": True,
+                "status": "valid",
+                "failure_reason": None,
+                "dimensioned": True,
+                "dt_sec": dt,
+                "motion_time_sec": round(motion_time, 6),
+                "max_velocity_rad_s": round(max_velocity, 6),
+                "max_acceleration_rad_s2": round(max_acceleration, 6),
+                "max_jerk_rad_s3": round(max_jerk, 6),
+            }
+        )
+        return result
+
+    # Proxy fallback (dimensionless): dt not available.
+    valid = max_step <= float(active["max_joint_step_l2"]) and max_accel_step <= float(
         active["max_acceleration_proxy_l2"]
     )
     failure_reason = None
-    if max_velocity > float(active["max_joint_step_l2"]):
+    if max_step > float(active["max_joint_step_l2"]):
         failure_reason = "failed_velocity_proxy"
-    elif max_acceleration > float(active["max_acceleration_proxy_l2"]):
+    elif max_accel_step > float(active["max_acceleration_proxy_l2"]):
         failure_reason = "failed_acceleration_proxy"
-    return {
-        "valid": bool(valid),
-        "status": "valid" if valid else "failed",
-        "failure_reason": failure_reason,
-        "max_velocity_proxy_l2": round(max_velocity, 8),
-        "max_acceleration_proxy_l2": round(max_acceleration, 8),
-        "velocity_proxy_threshold_l2": float(active["max_joint_step_l2"]),
-        "acceleration_proxy_threshold_l2": float(active["max_acceleration_proxy_l2"]),
-        "dt_sec": None,
-    }
+    result.update(
+        {
+            "valid": bool(valid),
+            "status": "valid" if valid else "failed",
+            "failure_reason": failure_reason,
+            "dimensioned": False,
+            "dt_sec": None,
+            "motion_time_sec": None,
+        }
+    )
+    return result
 
 
 def _evaluate_alignment(metrics: dict[str, Any], tolerance_deg: float) -> dict[str, Any]:

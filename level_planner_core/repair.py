@@ -58,6 +58,7 @@ class SeedRepairAdapter:
             success = _result_success(result)
             trajectory = _extract_first_interpolated_trajectory(result) if success else None
             status = str(getattr(result, "status", "success" if success else "trajopt_failed"))
+            interpolation_dt = _extract_interpolation_dt(result)
             optimizer_result = {
                 "status": status,
                 "success": bool(success),
@@ -67,6 +68,7 @@ class SeedRepairAdapter:
                 "seed_traj_shape": list(prepared.shape),
                 "trajectory_shape": list(trajectory.shape) if trajectory is not None else None,
                 "action_horizon": self.action_horizon,
+                "interpolation_dt_sec": interpolation_dt,
             }
             return SeedRepairResult(
                 success=bool(success),
@@ -110,6 +112,41 @@ def _result_success(result: Any) -> bool:
     if hasattr(success, "any"):
         return bool(success.any().item())
     return bool(success)
+
+
+def _extract_interpolation_dt(result: Any) -> float | None:
+    """Return the interpolation timestep (seconds) of the returned plan, or None.
+
+    Prefers the per-step ``dt`` tensor carried on the interpolated JointState;
+    falls back to the solver's ``maximum_trajectory_dt`` scalar. Confirmed at
+    runtime (A2.1): CuRobo V2 interpolates at 0.025 s (40 Hz) and populates the
+    JointState with dimensioned velocity/acceleration/jerk plus this dt.
+    """
+    try:
+        plan = result.get_interpolated_plan()
+    except Exception:
+        plan = None
+    dt = getattr(plan, "dt", None) if plan is not None else None
+    if dt is not None:
+        try:
+            if hasattr(dt, "detach"):
+                dt = dt.detach().cpu().reshape(-1)
+                if int(dt.numel()) > 0:
+                    return float(dt[0].item())
+            else:
+                return float(dt)
+        except Exception:
+            pass
+    for attr in ("maximum_trajectory_dt", "minimum_trajectory_dt", "interpolation_dt"):
+        value = getattr(result, attr, None)
+        if value is not None:
+            try:
+                if hasattr(value, "item"):
+                    return float(value.item())
+                return float(value)
+            except Exception:
+                continue
+    return None
 
 
 def _extract_first_interpolated_trajectory(result: Any) -> torch.Tensor:
