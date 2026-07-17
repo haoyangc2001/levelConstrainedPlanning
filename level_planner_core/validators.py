@@ -18,6 +18,10 @@ DEFAULT_THRESHOLDS = {
     "max_joint_step_l2": 2.0,
     "max_joint_step_abs": 1.5,
     "max_acceleration_proxy_l2": 3.0,
+    # A1.4: collision safety margin (meters). A trajectory is collision-valid iff the
+    # minimum signed distance to world obstacles along the path is >= this margin.
+    # cuRobo references 0-2.5cm activation bands; 0.005m is a conservative default.
+    "collision_safety_margin_m": 0.005,
 }
 
 
@@ -68,23 +72,23 @@ def evaluate_hard_constraints(
     optimizer_success: bool,
     world_summary: dict[str, Any] | None = None,
     thresholds: dict[str, float] | None = None,
+    collision_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Evaluate all currently available hard validation checks."""
+    """Evaluate all currently available hard validation checks.
+
+    ``collision_result`` is injected by the caller (the planner, which holds the
+    CuRobo world) so this module stays free of any curobo import. It is the dict
+    returned by ``planner._evaluate_collision(...)`` and carries the along-path
+    minimum signed distance plus a raw collision cost. When ``None`` the check
+    degrades to ``unchecked`` (kept valid) exactly as before A1.
+    """
     active = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
     alignment = _evaluate_alignment(metrics, alignment_tolerance_deg)
     goal = _evaluate_goal(metrics, active)
     continuity = _evaluate_continuity(trajectory_points, start_joint, active)
     joint_limit = evaluate_joint_limits(trajectory_points, joint_limits)
     velocity_acceleration = evaluate_velocity_acceleration_proxy(trajectory_points, active)
-    collision_safety = {
-        "checked": False,
-        "valid": True,
-        "status": "unchecked",
-        "min_distance_m": None,
-        "collision_cost_proxy": None,
-        "reason_if_unchecked": "CuRobo distance replay is not wired in standalone phase 2.",
-        "world_summary": dict(world_summary or {}),
-    }
+    collision_safety = _evaluate_collision(collision_result, active, world_summary)
     optimizer = {
         "success": bool(optimizer_success),
         "status": "success" if optimizer_success else "failed",
@@ -112,6 +116,91 @@ def evaluate_hard_constraints(
         "failure_reason": None if valid else failure_reasons[0],
         "failure_reasons": failure_reasons,
         "checks": checks,
+    }
+
+
+def _evaluate_collision(
+    collision_result: dict[str, Any] | None,
+    thresholds: dict[str, float],
+    world_summary: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Interpret a planner-computed collision result against the safety margin.
+
+    Pure interpretation only — the along-path distance/cost is measured by the
+    planner (A1.2) and handed in via ``collision_result`` so validators never
+    imports curobo (A1.3).
+
+    Expected ``collision_result`` keys:
+      - ``min_distance_m``: minimum signed distance to obstacles over the path
+        (large positive when the world is empty; may be ``None`` if unavailable).
+      - ``collision_cost``: raw cuRobo world collision cost (0 == safe/outside
+        activation band, positive == within-margin/penetrating, meters).
+      - ``num_points`` / ``num_spheres``: coverage metadata (optional).
+    """
+    margin = float(thresholds.get("collision_safety_margin_m", 0.005))
+    world = dict(world_summary or {})
+
+    if collision_result is None:
+        return {
+            "checked": False,
+            "valid": True,
+            "status": "unchecked",
+            "min_distance_m": None,
+            "collision_cost_proxy": None,
+            "safety_margin_m": margin,
+            "reason_if_unchecked": "collision_result not provided by planner.",
+            "world_summary": world,
+        }
+
+    # Degenerate obstacle-free world: nothing to hit -> valid with large distance.
+    total_obstacles = int(world.get("total_count", 0) or 0)
+    if total_obstacles == 0:
+        return {
+            "checked": True,
+            "valid": True,
+            "status": "no_obstacles",
+            "min_distance_m": float("inf"),
+            "collision_cost_proxy": 0.0,
+            "safety_margin_m": margin,
+            "world_summary": world,
+        }
+
+    cost = collision_result.get("collision_cost")
+    min_distance = collision_result.get("min_distance_m")
+    cost_f = float(cost) if cost is not None else None
+    dist_f = float(min_distance) if min_distance is not None else None
+
+    # Primary gate: cuRobo world collision cost measured at activation = margin.
+    # cost == 0 means every sphere is at least `margin` away from all obstacles.
+    if cost_f is not None:
+        in_collision = cost_f > 0.0
+    elif dist_f is not None:
+        in_collision = dist_f < margin
+    else:
+        # Result object present but empty -> treat as unchecked rather than pass.
+        return {
+            "checked": False,
+            "valid": True,
+            "status": "unchecked",
+            "min_distance_m": None,
+            "collision_cost_proxy": None,
+            "safety_margin_m": margin,
+            "reason_if_unchecked": "collision_result carried no cost or distance.",
+            "world_summary": world,
+        }
+
+    valid = not in_collision
+    return {
+        "checked": True,
+        "valid": valid,
+        "status": "safe" if valid else "collision",
+        "failure_reason": None if valid else "collision_detected",
+        "min_distance_m": dist_f,
+        "collision_cost_proxy": cost_f,
+        "safety_margin_m": margin,
+        "num_points": collision_result.get("num_points"),
+        "num_spheres": collision_result.get("num_spheres"),
+        "world_summary": world,
     }
 
 

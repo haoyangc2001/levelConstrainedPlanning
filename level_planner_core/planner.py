@@ -62,6 +62,7 @@ class LevelPlannerConfig:
     max_joint_step_l2: float = 2.0
     max_joint_step_abs: float = 1.5
     max_acceleration_proxy_l2: float = 3.0
+    collision_safety_margin_m: float = 0.005
     rule_seed_num_waypoints: int = 30
     rule_seed_ik_return_seeds: int = 32
     rule_seed_include_smooth_bridge_variants: bool = True
@@ -178,6 +179,7 @@ class LevelConstrainedPlanner:
         self._robot_cfg: dict[str, Any] | None = None
         self._world_summary: dict[str, Any] = {}
         self._joint_limits: list[dict[str, Any]] = []
+        self._collision_checker: Any | None = None
         self._init_curobo()
 
     @classmethod
@@ -217,12 +219,88 @@ class LevelConstrainedPlanner:
         )
         self._world_summary = dict(world_result.get("world_summary") or {})
         self._planner.update_world(SceneCfg.create(world_result["world_dict"]))
+
+        # A1.2: build a world collision checker sharing the planner's already-loaded
+        # scene. Activation distance == safety margin so a returned world-cost of 0
+        # means every robot sphere is at least `margin` from all obstacles, and any
+        # positive cost (meters) means within-margin / penetrating.
+        self._collision_checker = self._build_collision_checker()
+
         LOGGER.info(
             "CuRobo initialized: joints=%s tool_frames=%s world=%s",
             self._joint_names,
             self._tool_frames,
             self._world_summary,
         )
+
+    def _build_collision_checker(self) -> Any | None:
+        """A1.2: construct a RobotCollisionChecker sharing the planner's scene.
+
+        Returns ``None`` if the world is obstacle-free (nothing to check) or if the
+        checker cannot be built; callers degrade the collision check to
+        ``no_obstacles`` / ``unchecked`` accordingly.
+        """
+        if int(self._world_summary.get("total_count", 0) or 0) == 0:
+            return None
+        try:
+            from curobo.collision_checking import (
+                RobotCollisionChecker,
+                RobotCollisionCheckerCfg,
+            )
+
+            cfg = RobotCollisionCheckerCfg.load_from_config(
+                robot_config=self._robot_cfg,
+                scene_collision_checker=self._planner.scene_collision_checker,
+                collision_activation_distance=float(self.config.collision_safety_margin_m),
+            )
+            return RobotCollisionChecker(cfg)
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("collision checker unavailable, collision check degraded: %s", exc)
+            return None
+
+    def _evaluate_collision(self, trajectory_points: list[list[float]]) -> dict[str, Any] | None:
+        """A1.2: measure the along-path world collision cost for a trajectory.
+
+        Returns a dict consumed by ``validators._evaluate_collision`` (kept curobo
+        free per A1.3), or ``None`` when no trajectory / no checker is available so
+        the validator degrades to ``unchecked``.
+        """
+        if not trajectory_points:
+            return None
+        if self._collision_checker is None:
+            # obstacle-free world (or checker failed to build); validator handles
+            # the no_obstacles degenerate case from world_summary.
+            return None
+        try:
+            import torch
+
+            q = torch.as_tensor(
+                trajectory_points, device=self.device, dtype=torch.float32
+            )
+            if q.ndim == 2:
+                q = q.unsqueeze(0)  # [1, horizon, dof]
+            world_dist, _self_dist = (
+                self._collision_checker.get_scene_self_collision_distance_from_joint_trajectory(q)
+            )
+            # world_dist is the cuRobo world collision cost per sphere (meters):
+            # 0 == outside activation band (safe), positive == within margin.
+            cost = float(world_dist.max().item())
+            margin = float(self.config.collision_safety_margin_m)
+            # Recover a signed-distance proxy: cost>0 penetrates the margin band by
+            # `cost`, so min signed distance ~= margin - cost. When cost==0 the true
+            # distance is unknown-but->=margin, reported as the margin itself.
+            min_distance_m = margin - cost if cost > 0.0 else margin
+            num_points = int(q.shape[1])
+            num_spheres = int(world_dist.shape[-1]) if world_dist.ndim >= 1 else None
+            return {
+                "collision_cost": cost,
+                "min_distance_m": min_distance_m,
+                "num_points": num_points,
+                "num_spheres": num_spheres,
+            }
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("collision evaluation failed, treating as unchecked: %s", exc)
+            return None
 
     def plan(self, request: dict[str, Any], out_dir: str | Path | None = None) -> dict[str, Any]:
         t0 = time.time()
@@ -1167,6 +1245,7 @@ class LevelConstrainedPlanner:
             optimizer_success=optimizer_success,
             world_summary=self._world_summary,
             thresholds=self._validator_thresholds(),
+            collision_result=self._evaluate_collision(trajectory_points),
         )
         validator_valid = bool(validator_metrics.get("valid"))
         if optimizer_success and not validator_valid:
@@ -1266,6 +1345,7 @@ class LevelConstrainedPlanner:
                     optimizer_success=optimizer_success,
                     world_summary=self._world_summary,
                     thresholds=self._validator_thresholds(),
+                    collision_result=self._evaluate_collision(points),
                 )
                 failure_reason = (
                     candidate.get("precheck", {}).get("failure_reason")
@@ -1335,6 +1415,7 @@ class LevelConstrainedPlanner:
             "max_joint_step_l2": float(self.config.max_joint_step_l2),
             "max_joint_step_abs": float(self.config.max_joint_step_abs),
             "max_acceleration_proxy_l2": float(self.config.max_acceleration_proxy_l2),
+            "collision_safety_margin_m": float(self.config.collision_safety_margin_m),
         }
 
     @staticmethod

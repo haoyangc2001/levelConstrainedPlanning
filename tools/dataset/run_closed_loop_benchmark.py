@@ -141,9 +141,15 @@ def _validator_failure_counts(result: dict[str, Any]) -> Counter[str]:
             if check and not check.get("valid", False):
                 counts[f"{name}_failed"] += 1
         collision = checks.get("collision_safety") or {}
-        if collision.get("status") == "unchecked":
+        status = collision.get("status")
+        if status == "unchecked":
             counts["collision_unchecked"] += 1
-        elif collision and not collision.get("valid", False):
+        elif status == "no_obstacles":
+            counts["collision_no_obstacles"] += 1
+        elif collision.get("valid", False):
+            # A1.5: real (non-degenerate) collision check that passed.
+            counts["collision_checked_ok"] += 1
+        elif collision:
             counts["collision_failed"] += 1
     return counts
 

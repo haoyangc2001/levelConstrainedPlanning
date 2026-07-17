@@ -109,8 +109,8 @@
         {
           "id": "A1",
           "description": "碰撞距离回放接入 (首项，阻断 C 的成功标签)：把 collision_safety 从 checked:False 变成沿轨迹的真实最小距离检测，成为硬验收门的一项。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [],
           "details": [
             "A1.1 接口 spike：定位本地 curobo.motion_planner.MotionPlanner 的世界碰撞查询接口 (world collision checker / sphere-distance / rollout primitive cost 之一)。A1 的前置未知项，先确认再写。**一并探明 per-link FK**——compute_kinematics 现只返回 tool 帧位姿(planner.py:735)，不足以摆放 64 个碰撞球，须确认能否取全连杆 sphere 位姿。",
@@ -128,7 +128,8 @@
             "level_planner_core/planner.py",
             "tools/dataset/run_closed_loop_benchmark.py"
           ],
-          "uncertainty": "世界距离查询接口尚未确认 (A1.1 spike 的目标)；curobo 不可在当前 shell import，须在 curobo conda 环境验证。"
+          "uncertainty": "已解除。",
+          "completion_note": "A1.1 spike 结论：CuRobo V2 RobotCollisionChecker.get_scene_self_collision_distance_from_joint_trajectory(q[batch,horizon,dof]) 返回逐球世界碰撞代价(米)：0=安全(超出激活带), 正值=侵入margin/穿模, 单调；per-link FK 由 KinematicsState.robot_spheres 内部处理。=> 走 A1.2 路径，A1.1b 自实现 SDF 兜底不需要。A1.2: planner._build_collision_checker() 复用 _planner.scene_collision_checker，激活距离=safety margin；planner._evaluate_collision(points) 返回 {collision_cost,min_distance_m,num_points,num_spheres}。A1.3: planner 计算好碰撞结果作 collision_result 传入 validators.evaluate_hard_constraints，validators 不 import curobo。A1.4: collision_safety_margin_m=0.005 加入 LevelPlannerConfig+_validator_thresholds+DEFAULT_THRESHOLDS；cost>0 -> collision_detected。A1.5: run_closed_loop_benchmark._validator_failure_counts 增加 collision_no_obstacles/collision_checked_ok，unchecked 归零。A1.6 验证(tools/dev/a1_collision_spike.py)：6障碍世界下 safe cost=0/dist=+0.005，into-floor cost=0.084/dist=-0.079，单调；validator 聚合：collision cost>0 触发 collision_detected 阻断 valid。全部 PASS。"
         },
         {
           "id": "A2",
@@ -157,7 +158,10 @@
           "description": "Benchmark harness 升级 (依赖 A1/A2 字段完整)：产出 E1 (成功率+约束误差+时间分位表) 与 E2 (Success@K vs 时间预算曲线) 所需数据。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["A1", "A2"],
+          "depends_on": [
+            "A1",
+            "A2"
+          ],
           "details": [
             "【致命·先做】A3.0 预算真截断：现 total_budget_ms 只记录不截断、各策略 timeout_sec 写死不等(rule 0.5s vs learned 2.0s, run_closed_loop_benchmark.py:78-119)——固定预算对比是假的。须让预算成为真 wall-clock 截断(或迭代/solve 次数预算)、跨策略统一 timeout/k、成功率按预算条件化。(a) 探明 CuRobo solve_pose 能否中途打断；(b) 不能则退『compute-budget=允许的 solve 调用数』语义、Fig.4 x 轴据此标注；(c) 统一所有策略同预算语义、去掉写死不等的 timeout_sec；(d) 成功率随预算条件化输出。这是 E2/Fig.4 与核心假设成立的前置。",
             "A3.1 K 扫描：把硬编码的 k_generate (2/4/6) 参数化为 --k-values。",
@@ -181,7 +185,10 @@
           "description": "统一论文级结果格式 (与 A3 共演化，A1/A2 字段定后定稿)：一份所有实验 (E1-E4)、所有方法 (我们+baseline) 都产出的规范记录，让表/图统一生成。是阶段 B baseline 必须遵守的契约，故规格要早定。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["A1", "A2"],
+          "depends_on": [
+            "A1",
+            "A2"
+          ],
           "details": [
             "A4.1 定义 paper_result.v1：{method, constraint_class(LP/LPO/PP/PPO), obstacle_density, obstacle_topology, K, budget_ms, budget_semantics(additive|fixed|compute), n_problems, n_seeds, success_rate, success_rate_ci{wilson_lo,wilson_hi}, success_at_k, per_problem_success[](逐问题成功位,供配对/McNemar), seed, hardware{gpu,cpu,ram}, constraint_error{...,violation_rate}, collision{min_dist,collision_rate}, latency{p50,p75,p95,p98,mean}, motion_quality{max_jerk,max_accel,mean_vel,motion_time}, diversity{waypoint_variance,ik_branch_count}, reconfiguration_count}。",
             "A4.2 benchmark JSON -> paper_result 转换器 (含 Wilson CI 计算、逐问题成功位透传)。",
@@ -212,13 +219,19 @@
           "description": "方法轴契约 (与 A3.7 耦合的前置)：定义『方法 = 名称 + callable(request,config)->result_dict』，把 runner 从硬编码单一 planner 改成方法注册表，不写任何外部 planner。现有 4 策略变成 ours/* 方法，外部方法并列注册。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["A3", "A4"],
+          "depends_on": [
+            "A3",
+            "A4"
+          ],
           "details": [
             "现有 4 内部策略变成 ours/* 方法，外部方法并列注册。",
             "保持向后兼容 (tests/test_phase8_artifact_and_benchmark.py 守护)。",
             "设计成 run_closed_loop_benchmark 与 run_lifecycle_batch 都能 import 的独立 dispatch 模块 (两个 runner 现在各自实例化 planner)。"
           ],
-          "files": ["tools/dataset/run_closed_loop_benchmark.py", "level_planner_core/result_schema.py"],
+          "files": [
+            "tools/dataset/run_closed_loop_benchmark.py",
+            "level_planner_core/result_schema.py"
+          ],
           "uncertainty": "A3.7 是否作为共享模块交付，须与阶段 A 协同。"
         },
         {
@@ -234,7 +247,10 @@
             "**必须给 B5(投影式) 与 B3c(经典约束优化) 各一条最小可行路径**：即使全借用不可得，也要定出『最小自实现投影规划器 / 最小 CHOMP-TSR』的工作量与 scope，使约束强制型对手不因借用失败而全灭。"
           ],
           "review_change": "审查：B1 须为约束强制型对手(B5/B3c)输出最小可行路径，防『借不到就没有硬约束对手』。",
-          "files": ["docs/paper/referpaper/*.pdf (只读)", "docs/plan/"],
+          "files": [
+            "docs/paper/referpaper/*.pdf (只读)",
+            "docs/plan/"
+          ],
           "uncertainty": "外部仓库可得性无法从本仓库判断，B1 主要是文献 + 成本推理。"
         },
         {
@@ -242,7 +258,10 @@
           "description": "cuRobo 软约束 baseline (re-port，预期弱)：把 migration 快照里的 update_tool_pose_criteria 逐轴权重机制 re-port 进标准核心并暴露为方法。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["B0", "A1"],
+          "depends_on": [
+            "B0",
+            "A1"
+          ],
           "details": [
             "纠正：标准核心里没有 lambda_level (planner.py 搜 lambda_level/update_tool_pose_criteria 0 命中)，对齐是后置选择门强制的，不是软代价。",
             "真实机制在未移植的 migration/source_snapshot/curobo_v2_planner/main.py:4107-4126 _apply_shadow_non_terminal_pose_weight (逐轴权重 [0,0,0,w,w,w])。",
@@ -251,7 +270,11 @@
             "交付一条 λ-sweep 曲线(逐轴权重 w 扫描下对齐误差 vs 成功率)作为『软代价压不住路径约束』的定量证据，而非仅一句『不调 lambda』；此曲线进 E1/D5b 机理对照。"
           ],
           "review_change": "审查：B2 从『不调 lambda』升级为交付 λ-sweep 曲线，作为软代价失败的定量证据(喂 D5b 机理对照)。",
-          "files": ["level_planner_core/planner.py", "level_planner_core/result_schema.py", "tools/dataset/run_closed_loop_benchmark.py"],
+          "files": [
+            "level_planner_core/planner.py",
+            "level_planner_core/result_schema.py",
+            "tools/dataset/run_closed_loop_benchmark.py"
+          ],
           "uncertainty": "update_tool_pose_criteria API 及中途 pose cost 是否超出 horizon-1 须在 curobo conda 环境验证。"
         },
         {
@@ -259,12 +282,17 @@
           "description": "cuRobo 原生无约束下限 (近乎免费)：把 planner_native 单独暴露为 baseline/curobo_native_unconstrained，由硬验收门量出其 (预期高的) 对齐违约。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["B0"],
+          "depends_on": [
+            "B0"
+          ],
           "details": [
             "纠正：planner_native (planner.py:801-806, cuRobo plan_pose) 不是 RRT-Connect，是 cuRobo 自己的运动生成、对水平轴无约束。",
             "产出 source_type=planner_native 的候选，过硬验收门。"
           ],
-          "files": ["tools/dataset/run_closed_loop_benchmark.py", "level_planner_core/planner.py"],
+          "files": [
+            "tools/dataset/run_closed_loop_benchmark.py",
+            "level_planner_core/planner.py"
+          ],
           "uncertainty": "低——复用现有 planner_native 路径，只需干净的方法包装。"
         },
         {
@@ -272,13 +300,20 @@
           "description": "真实 RRT-Connect (外部，B1 定 scope)：按 B1 结论集成 OMPL RRTConnect 或 pRRTC，吃 SR5 URDF + 我们的碰撞世界；写 adapter 把路径转成我们的轨迹格式 + 构造 CandidateRecord (source_type=external_rrt_connect) 过同一验收器。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["B0", "B1", "A1"],
+          "depends_on": [
+            "B0",
+            "B1",
+            "A1"
+          ],
           "details": [
             "OMPL/pRRTC 集成，C++/Python 绑定 + 碰撞世界桥接。"
           ],
           "descope_terminal_state": "B3b 是 optional：若外部集成超期，明确 descope——E1 不含 RRT-Connect 列，正文一句说明『无约束采样式规划器不强制水平、作为定性对照略去』；约束强制对手由 B5/B3c 承担，保底集 B2/B3a/B4 不受影响。",
           "review_change": "审查：B3b 给出明确 descope 终态，从 B6 硬依赖降为 optional。",
-          "files": ["level_planner_core 或 tools/ 下新 adapter 模块", "tools/dataset/run_closed_loop_benchmark.py"],
+          "files": [
+            "level_planner_core 或 tools/ 下新 adapter 模块",
+            "tools/dataset/run_closed_loop_benchmark.py"
+          ],
           "uncertainty": "高——外部依赖，scope 由 B1 决定。"
         },
         {
@@ -286,13 +321,20 @@
           "description": "经典约束优化 baseline (用户决策新增，反 strawman)：CHOMP / GPMP2 / TrajOpt-TSR 一类把水平当硬约束(TSR/流形投影或约束代价)的经典轨迹优化对手，产出 CandidateRecord 过同一验收器。确保 Table I『constraint-enforcing optimization』格非空、E1 至少有一个真正的约束求解对手(区别于 B2 自认稻草人的 soft-cost 与 B3a 无约束地板)。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["B0", "B1", "A1"],
+          "depends_on": [
+            "B0",
+            "B1",
+            "A1"
+          ],
           "details": [
             "按 B1 结论选 CHOMP/GPMP2(有 Python 实现可借) 或最小 TrajOpt-TSR 复现；把 request 的 local_axis/target_world_axis/tolerance_deg 桥接成 TSR/约束代价。",
             "与 B5(投影式) 至少保住一个；两者都成则 Table I 更强。",
             "输出转 CandidateRecord (source_type=external_constrained_opt) 过 A1 真实碰撞 + 硬验收。"
           ],
-          "files": ["新经典约束优化 adapter 模块", "tools/dataset/run_closed_loop_benchmark.py"],
+          "files": [
+            "新经典约束优化 adapter 模块",
+            "tools/dataset/run_closed_loop_benchmark.py"
+          ],
           "uncertainty": "中——取决于 B1 的借用结论；GPMP2/CHOMP 有现成实现则成本可控。",
           "review_change": "审查+用户决策：新增 B3c 经典约束优化 baseline，反 strawman，与 B5 共同承担约束强制型对手角色。"
         },
@@ -301,13 +343,18 @@
           "description": "单向学习种子 (约等于现有 diffusion_only，且 = E3 一档)：DiffusionSeeder 式基线，实现一次，Phase D E3 复用。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["B0"],
+          "depends_on": [
+            "B0"
+          ],
           "details": [
             "纠正：B4 几乎不是新代码——就是现有 diffusion_only 策略 (run_closed_loop_benchmark.py:87-97，critic 自动关，:224)。",
             "真正差别：我们的 planner 总是跑 CuRobo repair + 硬验收门；DiffusionSeeder 式的『剥掉验收门』只能在报告层做 (记录 repair 后轨迹但不让 level-first 门拒绝它)，从而让 baseline 在『到达目标』上成功、我们量它真实的水平违约率。",
             "与 Phase D E3 的 6 档消融 (设计文档:378) 共享，不重复实现。"
           ],
-          "files": ["tools/dataset/run_closed_loop_benchmark.py", "level_planner_core/planner.py (仅报告模式 flag)"],
+          "files": [
+            "tools/dataset/run_closed_loop_benchmark.py",
+            "level_planner_core/planner.py (仅报告模式 flag)"
+          ],
           "uncertainty": "低 (主要是 config)；数字有意义需 C 的重训 checkpoint。"
         },
         {
@@ -315,12 +362,19 @@
           "description": "投影式约束规划 baseline (硬底线之一)：按 B1 包 OMPL ConstrainedStateSpace/ProjectedStateSpace (重) 或复现切空间投影规划器。B5 或 B3c 至少一个必须交付——这是全论文唯一一类真正把水平当硬约束的对手，不是可全砍的 optional。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["B0", "B1", "A1"],
+          "depends_on": [
+            "B0",
+            "B1",
+            "A1"
+          ],
           "details": [
             "把 request 的 local_axis/target_world_axis/tolerance_deg (planner.py:518-524) 桥接成投影约束函数，输出转 CandidateRecord 过验收器。",
             "若 B5 具体实现超期，回退到 B3c 经典约束优化承担『约束强制型对手』角色；但不允许 B5 与 B3c 同时缺席 (否则 E1 无硬约束对手、Table I 约束格空)。"
           ],
-          "files": ["新投影规划器模块", "tools/dataset/run_closed_loop_benchmark.py"],
+          "files": [
+            "新投影规划器模块",
+            "tools/dataset/run_closed_loop_benchmark.py"
+          ],
           "uncertainty": "最高——可行性取决于 B1；但『B5 或 B3c 至少一个』被提升为 B 阶段硬出口，不可两者皆砍。",
           "review_change": "审查：B5 从『可全砍的最高风险项』提升为硬底线(B5 或 B3c 至少一个必交付)，防论文只剩稻草人+无约束地板。"
         },
@@ -329,14 +383,23 @@
           "description": "统一进 A3/A4 harness：所有已交付 baseline 经同一 validators.evaluate_hard_constraints + A1 真实碰撞打分，喂 A4.2 转换器成 paper_result.v1；扩展 _summarize_strategy 消费外部 source_type；在 curobo conda 环境小批 smoke。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["B2", "B3a", "B4", "A3", "A4"],
+          "depends_on": [
+            "B2",
+            "B3a",
+            "B4",
+            "A3",
+            "A4"
+          ],
           "conditional_depends_on": "B3b optional(可 descope)；B5/B3c 为『至少一个』——B6 要求约束强制型对手集非空，但不强制两者皆到。不把 B3b/B3c/B5 全列为硬 depends_on，避免任一外部项失败即阻断整个 D。",
           "details": [
             "确保每个已交付 baseline 都产 candidate_records 由同一硬验收器 + A1 真实碰撞打分。",
             "扩展 _summarize_strategy 消费者 (run_closed_loop_benchmark.py:158-209) 处理外部 source_type。",
             "出口硬校验：约束强制型对手 (B5 或 B3c) 至少一个已接入并出 paper_result。"
           ],
-          "files": ["tools/dataset/run_closed_loop_benchmark.py", "A4 转换器模块"],
+          "files": [
+            "tools/dataset/run_closed_loop_benchmark.py",
+            "A4 转换器模块"
+          ],
           "uncertainty": "中——依赖 A4 schema 冻结；最终跑需 GPU curobo 环境。",
           "review_change": "审查：B6 依赖从『B2+B3a+B3b+B4+B5 全合取』改为保底集(B2/B3a/B4)硬依赖 + B3b optional + B5/B3c 至少一个，防单外部项失败阻断整个 D。"
         }
@@ -362,9 +425,15 @@
           "description": "A1 门 (硬前置)：在生成任何 C 数据前，确认 Phase A 的 A1 碰撞回放已落地 (collision_safety 能发出 failure_reason)。否则正样本碰撞盲。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["A1"],
-          "details": ["阻断 C2/C3/C4。"],
-          "files": ["level_planner_core/validators.py"],
+          "depends_on": [
+            "A1"
+          ],
+          "details": [
+            "阻断 C2/C3/C4。"
+          ],
+          "files": [
+            "level_planner_core/validators.py"
+          ],
           "uncertainty": "无——是校验门。"
         },
         {
@@ -377,7 +446,9 @@
             "未做前，障碍密度只能当分层标签，不得声称密度覆盖。",
             "阻断『x障碍密度』那半个目标，不阻断 keep-level scale-up。"
           ],
-          "files": ["level_planner_core/planner.py"],
+          "files": [
+            "level_planner_core/planner.py"
+          ],
           "uncertainty": "update_world 的 per-request 开销与重建策略 (每请求 vs 按 case 分组) 需评估。"
         },
         {
@@ -392,7 +463,11 @@
             "test 集请求 id 命名空间与 train 隔离并记录，供 D2/E 可追溯。",
             "登记为『评测公正性』硬前置：无冻结 split，则 C4 正/负结论不可辩护 (审查确认的自证循环)。"
           ],
-          "files": ["tools/dataset/sample_tasks.py", "tools/dataset/export_core_results_dataset.py", "tools/dataset/run_closed_loop_benchmark.py"],
+          "files": [
+            "tools/dataset/sample_tasks.py",
+            "tools/dataset/export_core_results_dataset.py",
+            "tools/dataset/run_closed_loop_benchmark.py"
+          ],
           "uncertainty": "低——工程直接；关键是 split 在问题级而非候选级，防泄漏。",
           "review_change": "审查(多视角命中)：新增 C0c 冻结实例级 disjoint train/val/test，破 C4 自证循环、使留出集真正独立。"
         },
@@ -402,8 +477,12 @@
           "status": "pending",
           "completed": false,
           "depends_on": [],
-          "details": ["可与 A 并行起草，但数据实跑等 A1。"],
-          "files": ["tools/dataset/sample_tasks.py"],
+          "details": [
+            "可与 A 并行起草，但数据实跑等 A1。"
+          ],
+          "files": [
+            "tools/dataset/sample_tasks.py"
+          ],
           "uncertainty": "可达性/IK 预检过滤的实现与拒绝率。"
         },
         {
@@ -418,7 +497,12 @@
             "(3) validators 的 _evaluate_alignment/_evaluate_goal 按活动类条件化。",
             "(4) condition.py 加类编码——这会改 condition_dim -> 改 diffusion condition_dim 与 critic input_dim(227) -> 作废现有 checkpoint (是全新训练，非 warm-start)。"
           ],
-          "files": ["tools/dataset/sample_tasks.py", "level_planner_core/planner.py", "level_planner_core/validators.py", "tools/learning/diffusion_seed_learning/condition.py"],
+          "files": [
+            "tools/dataset/sample_tasks.py",
+            "level_planner_core/planner.py",
+            "level_planner_core/validators.py",
+            "tools/learning/diffusion_seed_learning/condition.py"
+          ],
           "uncertainty": "最高之一——多文件特性 + checkpoint schema 变更；GoalToolPose 是否支持 position-only 须验证。",
           "descope_branch": "若 C1b 被砍 (keep-level-only 为终稿)：Table I 删 constraint-class 列、差异化改由 projection/throughput/closed-loop/learning-target 承载 (对 McVAMP 仍成立)；Intro/Abstract/VI-Limitations 显式收窄为 single orientation-path(keep-level) constraint；D2 请求集塌为 keep-level×(密度 or 单世界)×100；E4w Table I 约束列标 conditional；E8w 贡献(3)择措辞扩展为同时按 C1b 落地与否收窄约束 scope。**登记：descope C1b 即触发 reframe，非无损**——约束类是把故事撑出单一 keep-level、区别于支持 LP/LPO/PP/PPO 的 McVAMP 的唯一杠杆。",
           "review_change": "审查：C1b 补显式 descope 分支 + reframe 后果 (原兜底只讨论砍 B5/C4/E4，从未承认砍 C1b 会塌 novelty)。"
@@ -428,13 +512,23 @@
           "description": "keep-level-only 首轮 scale-up 到 3000+ (A1 后即可，today 可达)：现管线已能从少量请求产出大量候选。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["C0a", "C0c", "C1a"],
+          "depends_on": [
+            "C0a",
+            "C0c",
+            "C1a"
+          ],
           "details": [
             "sample_tasks.py --count N (难度 x 障碍-case-as-label x seed 模式) -> run_lifecycle_batch.py (--progress --resume GPU) -> export_core_results_dataset.py -> validate_candidate_dataset.py -> write_dataset_pointer.py。",
             "按目标正样本数 (非样本数) 估请求数；A1 后有效率会低于 ~14-17%，据此加请求。",
             "只用 C0c 的 train split 生成训练数据；test split 请求留给 C4/E2。"
           ],
-          "files": ["tools/dataset/sample_tasks.py", "tools/dataset/run_lifecycle_batch.py", "tools/dataset/export_core_results_dataset.py", "tools/dataset/validate_candidate_dataset.py", "tools/dataset/write_dataset_pointer.py"],
+          "files": [
+            "tools/dataset/sample_tasks.py",
+            "tools/dataset/run_lifecycle_batch.py",
+            "tools/dataset/export_core_results_dataset.py",
+            "tools/dataset/validate_candidate_dataset.py",
+            "tools/dataset/write_dataset_pointer.py"
+          ],
           "uncertainty": "A1 后正样本有效率下降幅度未知，可能需显著加请求数。"
         },
         {
@@ -442,9 +536,16 @@
           "description": "全 LP/LPO/PP/PPO x 密度 scale-up：仅在 C1b (约束类) + C0b (per-request 世界) 都就绪后可做，否则 4 类塌成同一 keep-level、密度恒定。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["C1b", "C0b", "C2"],
+          "depends_on": [
+            "C1b",
+            "C0b",
+            "C2"
+          ],
           "details": [],
-          "files": ["tools/dataset/sample_tasks.py", "tools/dataset/run_lifecycle_batch.py"],
+          "files": [
+            "tools/dataset/sample_tasks.py",
+            "tools/dataset/run_lifecycle_batch.py"
+          ],
           "uncertainty": "依赖 C1b/C0b 两个高不确定前置。"
         },
         {
@@ -452,7 +553,9 @@
           "description": "重训 diffusion + critic：走 Phase-8 训练路径，参照旧项目 Phase-10 超参并按 C2 正样本数校准 batch。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["C2"],
+          "depends_on": [
+            "C2"
+          ],
           "details": [
             "train.py --epochs 240 --batch-size 64 --hidden-dim 128 --diffusion-steps 64 --horizon 32 --samples <new>。",
             "train_critic.py --epochs 160 --batch-size 64 --hidden-dim 128 --horizon 32 --samples <new>。",
@@ -461,7 +564,12 @@
             "只吃 C0c 的 train split；若 C1b 改了 condition_dim/input_dim，是全新训练。"
           ],
           "review_change": "审查：C3 主模型启用 C3b 的 L_level/L_collision (作全组件档)，并明确只吃 train split。",
-          "files": ["tools/learning/diffusion_seed_learning/train.py", "tools/learning/diffusion_seed_learning/train_critic.py", "tools/learning/diffusion_seed_learning/register_model_artifacts.py", "tools/dataset/write_dataset_pointer.py"],
+          "files": [
+            "tools/learning/diffusion_seed_learning/train.py",
+            "tools/learning/diffusion_seed_learning/train_critic.py",
+            "tools/learning/diffusion_seed_learning/register_model_artifacts.py",
+            "tools/dataset/write_dataset_pointer.py"
+          ],
           "uncertainty": "batch 须按正样本数校准 (DataLoader clamp)。"
         },
         {
@@ -475,7 +583,11 @@
             "每个组件做成 --enable-xxx flag，供 C5 逐个关掉重训。",
             "若某组件不实现，则从 Method 与 D5 消融中删除该档，不得书面声称。"
           ],
-          "files": ["tools/learning/diffusion_seed_learning/diffusion.py", "tools/learning/diffusion_seed_learning/train.py", "tools/learning/diffusion_seed_learning/critic.py"],
+          "files": [
+            "tools/learning/diffusion_seed_learning/diffusion.py",
+            "tools/learning/diffusion_seed_learning/train.py",
+            "tools/learning/diffusion_seed_learning/critic.py"
+          ],
           "uncertainty": "中——L_level 直接；L_collision 依赖 A1 的可微/可评估碰撞。",
           "review_change": "审查：新增 C3b 真正实现 L_level/L_collision/多样性开关，否则 D5 第6档消融与 Method 声称未实现组件 (diffusion.py 现纯 MSE)。"
         },
@@ -484,7 +596,11 @@
           "description": "验证核心假设 (用现成比较器，含统计)：run_closed_loop_benchmark.py --strategies rule_only,diffusion_only,diffusion_critic,mixed_fallback 在 C0c 冻结的 test 请求集上跑，同一预算语义 (A3.0)、每设定 ≥3 种子重复 (A3.8)、报 Wilson CI + 配对 McNemar，按预注册阈值判 go/no-go。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["C3", "C0a", "C0c"],
+          "depends_on": [
+            "C3",
+            "C0a",
+            "C0c"
+          ],
           "details": [
             "贡献 (3) 的成败点；仅在 A1 后有意义。",
             "只在 test split 上评 (训练从未见)，破自证循环。",
@@ -492,7 +608,9 @@
             "预注册判据：learned vs rule 的成功率差 + Wilson CI + McNemar p 值；差异不显著则 C4 记『未证优于规则』而非任凭措辞。",
             "补一个独立几何校验 (D7 的轻量版)：至少对 test 上的成功轨迹用与训练标签不同的实现复算 max_alignment_deviation，防训练/评测同尺子自证。"
           ],
-          "files": ["tools/dataset/run_closed_loop_benchmark.py"],
+          "files": [
+            "tools/dataset/run_closed_loop_benchmark.py"
+          ],
           "uncertainty": "高——重训后学习种子仍可能不超过规则种子 (计划最大不确定项之一)。",
           "review_change": "审查(多视角命中)：C4 补 test-split-only、预算语义对齐 A3.0、≥3 种子重复、Wilson CI + McNemar、预注册 go/no-go 阈值、独立几何校验——破自证循环 + 无统计协议。"
         },
@@ -501,13 +619,20 @@
           "description": "组件消融重训 (为 D5 第6档提供模型)：基于 C3b 的开关，逐个关闭 L_level / L_collision / 多样性筛选各重训一个变体，产出可在 test 上对比的 checkpoint 集。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["C3", "C3b"],
+          "depends_on": [
+            "C3",
+            "C3b"
+          ],
           "details": [
             "对每个 --enable-xxx 关一个重训 (warm-start 或全新，视 condition_dim 是否变)。",
             "每个变体注册独立 artifact 指针，供 D5 逐档跑 benchmark。",
             "只在 train split 训、test split 评 (与 C0c 一致)。"
           ],
-          "files": ["tools/learning/diffusion_seed_learning/train.py", "tools/learning/diffusion_seed_learning/train_critic.py", "tools/learning/diffusion_seed_learning/register_model_artifacts.py"],
+          "files": [
+            "tools/learning/diffusion_seed_learning/train.py",
+            "tools/learning/diffusion_seed_learning/train_critic.py",
+            "tools/learning/diffusion_seed_learning/register_model_artifacts.py"
+          ],
           "uncertainty": "中——算力随变体数线性增；D5 第6档硬依赖它。",
           "review_change": "审查：新增 C5 组件消融重训，D5 第6档从『依赖不存在的模型』变为有真实变体 checkpoint。"
         }
@@ -538,7 +663,9 @@
             "E1/E2/E3 仿真机器人 = SR5；不引 CR7 的 44->92 历史数字作为本文结果 (如需可在 Related/背景以『既往工作』一句带过)。",
             "无整机上线工作 (CR7 URDF/球化/配置全部不做)。"
           ],
-          "files": ["docs/paper/writing-guide.md"],
+          "files": [
+            "docs/paper/writing-guide.md"
+          ],
           "uncertainty": "决策已定；writing-guide 文本同步尚未落笔 (登记为落实项)。"
         },
         {
@@ -546,7 +673,9 @@
           "description": "A/B/C 出口校验 (花算力前的门)：逐条核验 A/B/C 就绪。任一不过 -> 回对应阶段补齐。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["D0"],
+          "depends_on": [
+            "D0"
+          ],
           "details": [
             "A1 落地 (collision_safety 返回真实最小距离、collision_unchecked==0)。",
             "A2 落地 (dt_sec!=null、有真实 jerk/motion_time)。",
@@ -564,14 +693,20 @@
           "description": "生成 E1 请求集 (每组 100 独立 start-goal 对，维度条件化 + test 命名空间)：用 C1 扩展后的 sample_tasks.py 出请求集，规模随 C1b/C0b 落地与否条件化，请求 id 落 C0c 的 test 命名空间。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["D1", "C0c", "C1a"],
+          "depends_on": [
+            "D1",
+            "C0c",
+            "C1a"
+          ],
           "conditional_depends_on": "C1b (约束类维度)、C0b (密度维度) 为条件依赖：都做 = LP/LPO/PP/PPO x {none,sparse,dense} x 100 = 1200；仅 C0b = keep-level x 3 密度 x 100 = 300；都未做 = keep-level x 单世界 x 100 = 100 (密度仅 future work)。杜绝 1200 个近重复请求。",
           "details": [
             "确保 start/goal 真独立可达 (IK 校验)、每请求障碍在 plan 时真加载 (per-request 世界重载，若 C0b 就绪)，冻结随机种子。",
             "请求 id 用 C0c 的 test split 命名空间，与训练 (train split) 隔离并记录，供 E 可追溯。",
             "维度按上方 conditional_depends_on 条件化，不硬造 1200。"
           ],
-          "files": ["tools/dataset/sample_tasks.py"],
+          "files": [
+            "tools/dataset/sample_tasks.py"
+          ],
           "uncertainty": "依赖 C1a + 条件依赖 C1b/C0b；维度随其落地情况伸缩。",
           "review_change": "审查：D2 请求集维度条件化 (1200/300/100 随 C1b/C0b)，并落在 C0c 的 test 命名空间——防近重复请求 + 训练/评测泄漏。"
         },
@@ -580,7 +715,13 @@
           "description": "E1 横向仿真矩阵：完整闭环 + 保底集 (B2/B3a/B4) + 约束强制型对手 (B5 或 B3c 至少一个) + B3b(若就绪) 在 D2 请求集上跑，每设定 ≥3 种子重复，收集成功率(含 Wilson CI)/约束误差分布/碰撞/延迟 -> A4.2 转 paper_result -> E1 表。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["D2", "C3", "B6", "A3", "A4"],
+          "depends_on": [
+            "D2",
+            "C3",
+            "B6",
+            "A3",
+            "A4"
+          ],
           "details": [
             "--resume，慢/CPU baseline 分开跑。",
             "必含至少一个约束强制型对手 (B5/B3c)——否则矩阵只有稻草人(B2)+无约束地板(B3a)。",
@@ -588,7 +729,10 @@
             "收集成功率、约束误差分布 (mean/p50/p95/max + 违约率)、碰撞最小距离/率、延迟 p50/p75/p95/p98/mean。",
             "规模提示：最多 4 类 x 3 密度 x 100 对 x 方法数 x 种子数；按 D2 条件化维度与 D1 go/no-go 结果决定是否跑全量，按方法分批过夜跑。"
           ],
-          "files": ["tools/dataset/run_closed_loop_benchmark.py", "A4 转换器"],
+          "files": [
+            "tools/dataset/run_closed_loop_benchmark.py",
+            "A4 转换器"
+          ],
           "uncertainty": "算力密集；外部 baseline 就绪度决定方法数，D2 维度与 D1 门决定规模。",
           "review_change": "审查：D3 显式依赖 C3(checkpoint) + 强制含约束强制型对手(B5/B3c) + ≥3 种子 + Wilson CI + 配对 McNemar；规模随 D2 条件化。"
         },
@@ -597,14 +741,20 @@
           "description": "E2 时间预算曲线 (Fig.4)：在密集障碍子集 (C0c test split) 上，用 A3.0 的真预算截断 + A3 --budget-values x --k-values 扫描；Success@K 后处理 candidate_records 不重跑；≥3 种子重复出带 CI 误差带的 Fig.4；曲线明确标注预算语义 (fixed wall-clock vs additive vs compute-budget)。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["D1", "C3", "C0c"],
+          "depends_on": [
+            "D1",
+            "C3",
+            "C0c"
+          ],
           "details": [
             "预算必须是 A3.0 的真截断/同语义，否则 Fig.4 是假对比 (rule 0.5s vs learned 2.0s)。",
             "Fig.4 是『贡献(2)下界保证』的验证/证伪图：固定预算下若 mixed<rule 出现交叉点，则下界句须重述为 additive-budget floor (见 E1w/E8w)。",
             "结果不确定：核心假设 (固定预算下学习超过规则) 尚无正面结果，可能落成『假设+协议』。",
             "只在 test split 上跑；每档 ≥3 种子、成功率带 Wilson CI。"
           ],
-          "files": ["tools/dataset/run_closed_loop_benchmark.py"],
+          "files": [
+            "tools/dataset/run_closed_loop_benchmark.py"
+          ],
           "uncertainty": "高——正面结果不保证；且可能证伪贡献(2)固定预算下界。",
           "review_change": "审查：D4 绑 A3.0 真预算语义 + test split + ≥3 种子 CI，并登记为贡献(2)下界保证的验证/证伪图。"
         },
@@ -613,7 +763,10 @@
           "description": "补齐 E3 缺失档 + 时间匹配对照，再跑 6 档消融：第 2 档硬门 on/off toggle、第 6 档组件消融 (用 C5 的消融 checkpoint)、wall-clock 预算匹配对照，在混合场景 (test split) 跑全部档，带 CI/显著性。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["D1", "C5"],
+          "depends_on": [
+            "D1",
+            "C5"
+          ],
           "details": [
             "新建 (非仅配置)：第 2 档硬门 on/off toggle (现无 flag 关验收器)。",
             "第 6 档 -level损失/-碰撞引导/-多样性筛选：用 C5 已重训的消融 checkpoint (不再依赖不存在的模型)。",
@@ -621,7 +774,11 @@
             "算成功率单调链 (mixed_fallback >= rule_only >= 单组件) + VAR 逐点方差多样性；单调链本身是固定预算断言，叙述须加预算条件 (见 E1w)。",
             "每档 ≥3 种子、报 CI；第 1/3/4/5 档已现成。"
           ],
-          "files": ["level_planner_core/planner.py", "tools/dataset/run_closed_loop_benchmark.py", "tools/learning/diffusion_seed_learning/"],
+          "files": [
+            "level_planner_core/planner.py",
+            "tools/dataset/run_closed_loop_benchmark.py",
+            "tools/learning/diffusion_seed_learning/"
+          ],
           "uncertainty": "第 6 档消融 checkpoint 由 C5 提供；算力随档数×种子数增。",
           "review_change": "审查：D5 第6档改依赖 C5 真实消融 checkpoint；补 ≥3 种子/CI；wall-clock 匹配档标注为贡献(2)下界证伪点。"
         },
@@ -630,14 +787,19 @@
           "description": "负面结果诊断实验 (即使学习不赢闭环仍有价值的可证伪主张)：若 C4/D4 显示完整闭环不优于纯规则，跑一组机理诊断给出学习环仍有价值的第一方证据——(a) critic 筛掉高失败种子是否降 p98 尾延；(b) 失败回流数据是否可复用/提升后续轮次；(c) B2 λ-sweep vs 硬门的对齐误差-成功率对照。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["D4"],
+          "depends_on": [
+            "D4"
+          ],
           "details": [
             "(a) critic 尾延主张：注意 critic.py 的 collision_risk 现恒 0——须先经 A1 真实碰撞标签重训 critic 才能声称碰撞相关价值，登记此依赖 (无 A1 重训 critic 则不作该主张)。",
             "(b) 数据回流价值：比较用/不用失败回流数据的后续训练成功率。",
             "(c) 复用 B2 的 λ-sweep 曲线佐证软代价失败、硬门必要。",
             "所有主张须可证伪 + 配 test split 支撑实验，喂 E6w/E8w 的诚实叙事。"
           ],
-          "files": ["tools/dataset/run_closed_loop_benchmark.py", "tools/learning/diffusion_seed_learning/"],
+          "files": [
+            "tools/dataset/run_closed_loop_benchmark.py",
+            "tools/learning/diffusion_seed_learning/"
+          ],
           "uncertainty": "中——是负面兜底路径，仅在 C4/D4 负面时触发；critic 主张依赖 A1 重训。",
           "review_change": "审查：新增 D5b 负面结果诊断，为『学习不赢闭环仍有价值』提供可证伪的第一方证据 (贡献2/3 塌陷时的兜底论据)。"
         },
@@ -646,14 +808,18 @@
           "description": "E4 实机：先决 scope——复用旧硬件证据 (20/20, 18/20，诚实标注 log 在旧项目) 或跑新硬件试验 (须先建轨迹下发桥)。若硬件/时间不可得，E4 以『既往验证』呈现。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["D3"],
+          "depends_on": [
+            "D3"
+          ],
           "details": [
             "选项 (i) 复用旧硬件证据承载论文：**必须标注为 prior validation of the same SR5 platform in earlier work + 旧项目引用，不得作为本文第一方『我们做了 20/20』结果** (无本仓 artifact)。",
             "选项 (ii) 跑新硬件：须先建轨迹下发桥 (现 ROS 节点只 plan+写文件、无执行)、布置无障碍+杂乱 SR5 工位、统一协议下 vs 最强 1-2 baseline；记录成功 (目标位姿 + 全路径水平容差 + 无碰) + 关节跟踪误差。",
             "实机安全 checklist (走选项 ii 必须)：限速/急停/工作空间限位/碰撞前软停/人员隔离——写进方法与附录，防审稿人质疑真机安全。",
             "计划兜底允许以『既往验证』呈现，但按 E7w/E8w 标 prior + 引用，不进第一方结果表。"
           ],
-          "files": ["level_planner_ros/planner_node.py (若走新硬件)"],
+          "files": [
+            "level_planner_ros/planner_node.py (若走新硬件)"
+          ],
           "uncertainty": "高——硬件可得性 + 无执行桥。",
           "review_change": "审查：D6 明确旧 20/20 只能标 prior validation + 引用 (非第一方)；走新硬件须附实机安全 checklist。"
         },
@@ -662,13 +828,23 @@
           "description": "独立几何校验 + 汇总成表/图 + 诚实分层叙事：先用与训练标签不同实现的独立校验器复算 test 上报成功轨迹的 max_alignment_deviation/碰撞 (破同尺子自证)；再把所有 paper_result 喂 A4.3 生成器 (Table I/II、Fig.4，带 CI)；E1/E4 写成已验证结论，E2/E3 若 C4 负面则写『假设+协议+初步基线』；每个数字对齐 runs/reports/ 的 artifact。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["D3", "D4", "D5", "D5b", "D6"],
+          "depends_on": [
+            "D3",
+            "D4",
+            "D5",
+            "D5b",
+            "D6"
+          ],
           "details": [
             "独立几何校验器：不复用 constraints.py 的同一 FK/对齐实现，用第二套 (如 pytransform3d 或手写 FK) 复算，抽样比对，差异超阈值即报警——防训练/评测/成功判定同一把尺子的自证循环。",
             "所有论文数字须追溯到 runs/reports/ 的 artifact，无 prose-only 数字。",
             "叙事按 C4/D4 结果三层分层 (见 critical_path_and_risks 的 honest_layering)。"
           ],
-          "files": ["A4.3 图表生成器", "新独立几何校验模块", "docs/paper/"],
+          "files": [
+            "A4.3 图表生成器",
+            "新独立几何校验模块",
+            "docs/paper/"
+          ],
           "uncertainty": "叙事分层取决于 C4/D4 结果。",
           "review_change": "审查：D7 前置一个独立几何校验器 (第二套 FK/对齐实现) 破自证循环；依赖补 D5b。"
         }
@@ -697,7 +873,9 @@
           "completed": false,
           "depends_on": [],
           "details": [],
-          "files": ["docs/paper/main.tex"],
+          "files": [
+            "docs/paper/main.tex"
+          ],
           "uncertainty": "无。"
         },
         {
@@ -705,7 +883,9 @@
           "description": "起草 Method / System Design (IV，两个创新)——最高置信、不受 D 阻断，最先写。本节用『批量轨迹优化器』，不点名 cuRobo。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["E0"],
+          "depends_on": [
+            "E0"
+          ],
           "details": [
             "IV-A 总览段 (pipeline = 执行器+数据生成器+带回退的验收器)。",
             "IV-B 创新 A (流形感知预置种子：笛卡尔插值 + 目标相对 twist Q_i=Q_g*T_y(theta_i) + 分支一致 IK 代价；批量精修；硬后验门 + level-first 排序键，逐条挂到 Observation 1/2)。",
@@ -714,7 +894,9 @@
             "**下界保证措辞纪律**：不写无条件 'never degrades the success rate'；限定为 'provides a verified success-rate floor under an additive/unbounded budget (fallback is invoked after the learned attempt)'。IV-D 的 punchline 与成功率单调链 (mixed>=rule>=单组件) 须先声明预算语义 (fixed wall-clock vs additive) 再给下界句——固定预算下 mixed<rule 是可能的 trade-off，属贡献(3)效率维度，不是保证。",
             "源：设计文档 2.2-2.4/3.1-3.10 + level_planner_core/{rule_seed,repair,constraints,validators}.py。"
           ],
-          "files": ["docs/paper/main.tex"],
+          "files": [
+            "docs/paper/main.tex"
+          ],
           "uncertainty": "无——基于已有设计与代码。",
           "review_change": "审查：E1w 下界句加预算语义限定 (additive-budget floor，非无条件 never degrades)；单调链先声明预算语义。"
         },
@@ -723,13 +905,17 @@
           "description": "起草 Problem Formulation & Structural Limitations (III)：约束轨迹优化模型 + 流形视角 + Observation 1 (约束退化) / Observation 2 (初值敏感)，保持范式级不点名 cuRobo。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["E0"],
+          "depends_on": [
+            "E0"
+          ],
           "details": [
             "变量/平滑目标/约束含 eq:level。",
             "流形视角 (dim M=n-m、体积坍缩、IK 多分支连续)。",
             "Observation 1/2 (指南 :32-35 已预写文本)。"
           ],
-          "files": ["docs/paper/main.tex"],
+          "files": [
+            "docs/paper/main.tex"
+          ],
           "uncertainty": "无。"
         },
         {
@@ -743,7 +929,9 @@
             "修 PRESTO 占位 (2409.16012)、IKFlow 年份 (统一 2022)、去 and others 截断。",
             "CSVTO (Constrained Stein Variational Trajectory Optimization)：解决 referpaper/README 标注的 CSVTO TODO——补真实条目 (Power & Berenson, arXiv 2308.12110)，作为 B3c 经典/变分约束优化 baseline 的引用；若最终不引则从 TODO 列表删除并记录理由。"
           ],
-          "files": ["docs/paper/references.bib"],
+          "files": [
+            "docs/paper/references.bib"
+          ],
           "uncertainty": "arXiv ID 须逐条核对 (部分为推断)。",
           "review_change": "审查：E3w 逐条枚举 7+1 篇 arXiv ID，明确 CSVTO 条目 (关联 B3c) 并给 CSVTO TODO 一个终态 (补齐或删除)。"
         },
@@ -752,13 +940,17 @@
           "description": "起草 Related Work (II) + 建 Table I 骨架：四类关联工作 (采样式约束；IK 方法；轨迹优化；学习式 seeding/扩散)，每类以『我们如何不同』收尾。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["E3w"],
+          "depends_on": [
+            "E3w"
+          ],
           "details": [
             "指南 :104-105 的差异化句。",
             "Table I 列：projection/throughput/closed-loop/constraint-class/learning-target x {cpRRTC,McVAMP,DiffusionSeeder,PRESTO,ours}，先填定性格，量化 throughput 格待 D。",
             "**constraint-class 列 conditional on C1b**：若 C1b 被 descope (keep-level-only 为终稿)，删除 constraint-class 列 (否则本文单约束 vs McVAMP 多约束反成劣势)，差异化改由 projection/throughput/closed-loop/learning-target 承载 (对 McVAMP 仍成立)。见 critical_path_and_risks 的 c1b_descope_branch。"
           ],
-          "files": ["docs/paper/main.tex"],
+          "files": [
+            "docs/paper/main.tex"
+          ],
           "uncertainty": "throughput 量化格待 D；constraint-class 列取决于 C1b 是否落地。",
           "review_change": "审查：E4w 的 Table I constraint-class 列条件化——C1b descope 则删列并改由其它维度差异化。"
         },
@@ -767,14 +959,18 @@
           "description": "画三张概念图 (Fig.1/2/3，不需 D 数据，用 dataviz 技能)：先调 dataviz 保持风格一致。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["E0"],
+          "depends_on": [
+            "E0"
+          ],
           "details": [
             "Fig.1 teaser (约束流形薄面 + 坏种子偏离收敛到违约 vs 多种子近流形+硬门+回退)。",
             "Fig.2 系统总览 (跨栏 figure*，三阶段 pipeline + 五阶段闭环 + 回退箭头，标执行器/数据生成器/验收器)。",
             "Fig.3 种子构造 (twist 插值 + 连续 IK 分支选择示意)。",
             "导出到 docs/paper/figures/。"
           ],
-          "files": ["docs/paper/figures/"],
+          "files": [
+            "docs/paper/figures/"
+          ],
           "uncertainty": "无。"
         },
         {
@@ -782,14 +978,18 @@
           "description": "起草 Experiments 非数字部分 (V)——D 跑的同时写。此处才点名 cuRobo 作为优化器实例。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["E0"],
+          "depends_on": [
+            "E0"
+          ],
           "details": [
             "E1-E4 协议段 (按范式列 baseline；指标：最终成功率、约束误差分布、延迟 p50/p75/p98、Success@K、VAR 多样性；公平性 trade-off 声明)。",
             "**统计方法段** (新)：明确每设定 ≥3 采样种子重复、成功率报 Wilson 95% CI、完整闭环 vs baseline 用配对 McNemar 检验、预注册『学习超过规则』的显著性判据 (效应量 + p 阈值)——文献 (DiffusionSeeder/PRESTO) 报分布，本文须给 CI/显著性，否则 C4 正负判定任意。",
             "**预算语义段** (新)：先声明预算语义 (additive/unbounded vs fixed wall-clock vs compute-budget) 再报 Success@K 曲线；固定预算下的 mixed vs rule 高低是 trade-off，与 additive 下界句分开表述。",
             "插入诚实三层分层框架 (见 critical_path_and_risks)：C1 解耦范式=已验证；C2 下界安全架构=已验证但价值有限、self-improving 卖点与 C3 同属 C4/E2-contingent；数字格与曲线留 TODO 挂 D。"
           ],
-          "files": ["docs/paper/main.tex"],
+          "files": [
+            "docs/paper/main.tex"
+          ],
           "uncertainty": "无 (数字格留 TODO)。",
           "review_change": "审查：E6w 新增统计方法段 (≥3 种子/Wilson CI/McNemar/预注册显著性判据) + 预算语义段；诚实分层从只覆盖(3)扩到同时覆盖(2)下界措辞。"
         },
@@ -798,13 +998,20 @@
           "description": "填 Experiments 数字 + Fig.4 + 表 I/II 量化格 (阻断于 D)：用 D 的 paper_result 渲图填表。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["E6w", "E3w", "D7"],
+          "depends_on": [
+            "E6w",
+            "E3w",
+            "D7"
+          ],
           "details": [
             "建/接 A4.3 的 Success@K 绘图生成器，用 E2 paper_result 渲 Fig.4 (带 CI 误差带 + 预算语义标注)。",
             "填 Table II 消融 6 行 (证单调链 mixed>=rule，加预算语义脚注)；填 Table I throughput/约束误差格 + E1 成功率(带 Wilson CI)+约束误差+延迟表。",
             "印刷前用 A1 修好的碰撞重核 SR5 数字 (仅 SR5，去 CR7——CR7 URDF 不在本仓、非本文机器人，见 D0)。"
           ],
-          "files": ["docs/paper/main.tex", "A4.3 图表生成器"],
+          "files": [
+            "docs/paper/main.tex",
+            "A4.3 图表生成器"
+          ],
           "uncertainty": "阻断于 D (而 D 依赖 A/B/C)。",
           "review_change": "审查：E7w 去 CR7 重核 (仅 SR5)；Fig.4/Table 加 CI 与预算语义标注。"
         },
@@ -813,7 +1020,12 @@
           "description": "最后写 Intro (I) + Abstract，并去 cuRobo 化标题：四段式 Intro + 重写摘要去 3 处 CuRobo、去标题 CuRobo Repair。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["E1w", "E2w", "E4w", "E6w"],
+          "depends_on": [
+            "E1w",
+            "E2w",
+            "E4w",
+            "E6w"
+          ],
           "details": [
             "四段式 Intro (动机/范式局限(不点名 cuRobo)/洞见+方法/3 条贡献)。",
             "重写摘要去 3 处 CuRobo、去标题 CuRobo Repair (用指南候选标题)。",
@@ -822,7 +1034,9 @@
             "**贡献(3) 措辞**：按 C4/E2 结果择『已验证』或『假设+协议+初步基线』。",
             "**约束 scope**：若 C1b descope，则 Intro/Abstract/VI-Limitations 显式收窄为 single orientation-path (keep-level) constraint，不宣称多约束类。"
           ],
-          "files": ["docs/paper/main.tex"],
+          "files": [
+            "docs/paper/main.tex"
+          ],
           "uncertainty": "贡献 (2)(3) 措辞取决于 C4/E2 结果；约束 scope 取决于 C1b。",
           "review_change": "审查：E8w 把措辞纪律从只管贡献(3)扩到贡献(1)provenance (去44→92/prior标注)+贡献(2)self-improving以证据为门+约束scope随C1b收窄。"
         },
@@ -831,12 +1045,18 @@
           "description": "内审 + ICRA 格式/页数核对 + 构建 + 提交：latexmk 构建，清所有 cite/ref/未定义引用/浮动告警，核对 ICRA 2027 格式，按诚实分层与去 cuRobo 化通读润色，备 PaperPlaza 提交。",
           "status": "pending",
           "completed": false,
-          "depends_on": ["E7w", "E8w", "E5w"],
+          "depends_on": [
+            "E7w",
+            "E8w",
+            "E5w"
+          ],
           "details": [
             "cd docs/paper && latexmk -pdf main.tex (+ bibtex)。",
             "核对 ICRA 2027 (6 页、IEEEtran、PaperPlaza，官网确认确切页数/截止)。"
           ],
-          "files": ["docs/paper/main.tex"],
+          "files": [
+            "docs/paper/main.tex"
+          ],
           "uncertainty": "ICRA 2027 确切页数/截止须官网确认。"
         }
       ]
