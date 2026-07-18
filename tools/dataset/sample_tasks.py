@@ -166,6 +166,33 @@ def _parse_modes(value: str) -> list[str]:
     return modes or ["mixed"]
 
 
+def assign_split(
+    index: int,
+    *,
+    val_frac: float,
+    test_frac: float,
+    rng: random.Random,
+) -> str:
+    """Assign a problem-level train/val/test split label (C0c).
+
+    The split is assigned per *base problem* (one sampler ``index`` == one base
+    problem). Every candidate later derived from this request (the ``k_generate``
+    seeds expanded by ``run_lifecycle_batch``) inherits the request's split via
+    ``metadata.sampling.split``, so no problem leaks across splits and the C4/E2
+    hold-out is instance-level disjoint from train.
+
+    A deterministic per-index uniform draw (seeded RNG) is used rather than a
+    modulo bucket so the split is not correlated with the difficulty/obstacle/mode
+    cycles (which also key off ``index``).
+    """
+    draw = rng.random()
+    if draw < test_frac:
+        return "test"
+    if draw < test_frac + val_frac:
+        return "val"
+    return "train"
+
+
 def _sanitize_request_id(value: str) -> str:
     cleaned = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in value)
     return cleaned.strip("_") or "request"
@@ -181,28 +208,60 @@ def _sample_request(
     difficulty: str,
     obstacle_case: str,
     mode: str,
+    split: str = "train",
+    independent: bool = False,
 ) -> dict[str, Any]:
     profile = DIFFICULTY_PROFILES[difficulty]
     request = json.loads(json.dumps(base))
     base_pose = _target_pose_list(base)
     position_jitter = float(profile["position_jitter_m"])
-    pose = [
-        base_pose[0] + rng.uniform(-position_jitter, position_jitter),
-        base_pose[1] + rng.uniform(-position_jitter, position_jitter),
-        base_pose[2] + rng.uniform(-position_jitter, position_jitter),
-        *base_pose[3:7],
-    ]
-    pose[3:7] = _quat_multiply(
-        _random_delta_quat(rng, float(profile["orientation_jitter_deg"])),
-        _normalize_quaternion(pose[3:7]),
-    )
-    joint_jitter = float(profile["joint_jitter_rad"])
-    start_joint = [
-        round(float(value) + rng.uniform(-joint_jitter, joint_jitter), 6)
-        for value in base.get("start_joint", [])
-    ]
+    if independent:
+        # C1a: decorrelate start and goal. The start joint gets a *wide*
+        # independent draw (a large fraction of the difficulty joint range,
+        # scaled up ~6x over the correlated-jitter width) and the goal pose is
+        # drawn from a wide independent workspace box around the base pose, so
+        # the (start, goal) pair is not a single base config nudged twice.
+        # Reachability/IK feasibility is enforced downstream (optional
+        # --ik-precheck, else the lifecycle run + hard validators filter
+        # infeasible pairs) rather than by a sample-time IK solve.
+        start_scale = float(profile["joint_jitter_rad"]) * 6.0
+        start_joint = [
+            round(float(value) + rng.uniform(-start_scale, start_scale), 6)
+            for value in base.get("start_joint", [])
+        ]
+        goal_pos_scale = float(profile["position_jitter_m"]) * 4.0
+        pose = [
+            base_pose[0] + rng.uniform(-goal_pos_scale, goal_pos_scale),
+            base_pose[1] + rng.uniform(-goal_pos_scale, goal_pos_scale),
+            base_pose[2] + rng.uniform(-goal_pos_scale, goal_pos_scale),
+            *base_pose[3:7],
+        ]
+        pose[3:7] = _quat_multiply(
+            _random_delta_quat(rng, float(profile["orientation_jitter_deg"]) * 2.0),
+            _normalize_quaternion(pose[3:7]),
+        )
+    else:
+        pose = [
+            base_pose[0] + rng.uniform(-position_jitter, position_jitter),
+            base_pose[1] + rng.uniform(-position_jitter, position_jitter),
+            base_pose[2] + rng.uniform(-position_jitter, position_jitter),
+            *base_pose[3:7],
+        ]
+        pose[3:7] = _quat_multiply(
+            _random_delta_quat(rng, float(profile["orientation_jitter_deg"])),
+            _normalize_quaternion(pose[3:7]),
+        )
+        joint_jitter = float(profile["joint_jitter_rad"])
+        start_joint = [
+            round(float(value) + rng.uniform(-joint_jitter, joint_jitter), 6)
+            for value in base.get("start_joint", [])
+        ]
     request["schema_version"] = "1.0"
-    request["request_id"] = _sanitize_request_id(f"sample_{index:05d}_{difficulty}_{mode}_{obstacle_case}")
+    # C0c: namespace the request_id by split so the test hold-out is traceable
+    # and cannot be silently mixed into the training request set downstream.
+    request["request_id"] = _sanitize_request_id(
+        f"{split}_sample_{index:05d}_{difficulty}_{mode}_{obstacle_case}"
+    )
     request["robot_profile"] = "sr5"
     request["start_joint"] = start_joint
     request["target_pose"] = _pose_dict(pose, base)
@@ -231,7 +290,7 @@ def _sample_request(
         **dict(request.get("world") or {}),
         "sampled_obstacle_case": obstacle_case,
         "sampled_obstacles": OBSTACLE_LAYOUTS.get(obstacle_case, []),
-        "note": "Current standalone planner loads obstacles from config; sampled layout is recorded for dataset stratification.",
+        "note": "Consumed as a real per-request world when the planner runs with per_request_world=True (C0b); otherwise recorded for dataset stratification.",
     }
     metadata = dict(request.get("metadata") or {})
     metadata.update(
@@ -244,6 +303,8 @@ def _sample_request(
                 "obstacle_case": obstacle_case,
                 "seed_policy_mode": mode,
                 "base_request": str(base_path),
+                "split": split,
+                "sampling_mode": "independent" if independent else "base_jitter",
             },
             "num_candidates": int(profile["num_candidates"]),
         }
@@ -260,6 +321,9 @@ def generate_task_requests(
     difficulty: str = "mixed",
     obstacle_case: str = "mixed",
     modes: list[str] | None = None,
+    val_frac: float = 0.1,
+    test_frac: float = 0.2,
+    independent: bool = False,
 ) -> list[dict[str, Any]]:
     if count < 1:
         raise ValueError("count must be >= 1")
@@ -267,7 +331,12 @@ def generate_task_requests(
         raise ValueError(f"unsupported difficulty: {difficulty}")
     if obstacle_case not in {"none", "single", "multi", "mixed"}:
         raise ValueError(f"unsupported obstacle_case: {obstacle_case}")
+    if not (0.0 <= val_frac < 1.0 and 0.0 <= test_frac < 1.0 and val_frac + test_frac < 1.0):
+        raise ValueError("val_frac/test_frac must be in [0,1) with val+test < 1")
     rng = random.Random(seed)
+    # C0c: split assignment uses its own RNG stream so it is statistically
+    # independent of the pose-jitter draws and stays stable if jitter changes.
+    split_rng = random.Random(seed ^ 0x5F3759DF)
     modes = modes or ["mixed", "rule", "shadow"]
     bases = [(path, _load_json(path)) for path in base_request_paths]
     tasks: list[dict[str, Any]] = []
@@ -276,6 +345,7 @@ def generate_task_requests(
         bucket = _cycle_choice(index, difficulty, ["easy", "medium", "hard"])
         obstacle = _cycle_choice(index, obstacle_case, ["none", "single", "multi"])
         mode = modes[index % len(modes)]
+        split = assign_split(index, val_frac=val_frac, test_frac=test_frac, rng=split_rng)
         tasks.append(
             _sample_request(
                 base=base,
@@ -286,6 +356,8 @@ def generate_task_requests(
                 difficulty=bucket,
                 obstacle_case=obstacle,
                 mode=mode,
+                split=split,
+                independent=independent,
             )
         )
     return tasks
@@ -327,6 +399,8 @@ def build_manifest(
         "difficulty_bucket_counts": _counter_from_tasks(tasks, "difficulty_bucket"),
         "obstacle_case_counts": _counter_from_tasks(tasks, "obstacle_case"),
         "mode_counts": _counter_from_tasks(tasks, "seed_policy_mode"),
+        "split_counts": _counter_from_tasks(tasks, "split"),
+        "sampling_mode_counts": _counter_from_tasks(tasks, "sampling_mode"),
         "command": command or [],
         "request_schema": {
             "required": [
@@ -338,7 +412,7 @@ def build_manifest(
                 "seed_policy",
                 "metadata.sampling",
             ],
-            "note": "Obstacle cases are stratification metadata until per-request world reload is introduced.",
+            "note": "Obstacle cases become a real per-request world when the planner runs with per_request_world=True (C0b); otherwise they remain stratification metadata.",
         },
     }
 
@@ -353,6 +427,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--modes", default="mixed,rule,shadow")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--manifest-out", type=Path)
+    parser.add_argument("--val-frac", type=float, default=0.1,
+                        help="C0c: problem-level fraction assigned to the val split.")
+    parser.add_argument("--test-frac", type=float, default=0.2,
+                        help="C0c: problem-level fraction assigned to the held-out test split.")
+    parser.add_argument("--independent-sampling", action="store_true",
+                        help="C1a: draw start joint and goal pose independently (wide) "
+                             "instead of jittering a single base config twice.")
     args = parser.parse_args(argv)
 
     base_paths = args.base_request or [DEFAULT_BASE_REQUEST]
@@ -364,6 +445,9 @@ def main(argv: list[str] | None = None) -> int:
         difficulty=str(args.difficulty),
         obstacle_case=str(args.obstacle_case),
         modes=modes,
+        val_frac=float(args.val_frac),
+        test_frac=float(args.test_frac),
+        independent=bool(args.independent_sampling),
     )
     write_requests_jsonl(tasks, args.out)
     manifest_path = args.manifest_out or args.out.with_suffix(".manifest.json")

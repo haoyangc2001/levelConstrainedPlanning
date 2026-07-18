@@ -110,6 +110,13 @@ def _sample_from_candidate(
     alignment = normalized.get("alignment") or {}
     labels = dict(candidate.get("labels") or {})
     source_lineage = dict(candidate.get("source_lineage") or {})
+    # C0c: carry the problem-level split label + request_id onto every derived
+    # sample so training can be filtered to `train` only and the split is
+    # auditable per candidate. Fall back to "unknown" for legacy runs with no
+    # split-tagged sampler metadata.
+    sampling_meta = (normalized.get("metadata") or {}).get("sampling") or {}
+    split_label = str(sampling_meta.get("split") or "unknown")
+    request_id = normalized.get("request_id") or result.get("request_id")
     task = {
         "robot_profile": normalized.get("robot_profile") or run_record.get("robot_profile") or "sr5",
         "tool_frame": (run_record.get("environment") or {}).get("tool_frames", ["tool1"])[0],
@@ -127,6 +134,13 @@ def _sample_from_candidate(
         "dataset_name": dataset_name,
         "sample_id": f"{result_path.parent.name}:{candidate.get('candidate_id')}",
         "sample_type": "candidate",
+        "sampling": {
+            "split": split_label,
+            "request_id": request_id,
+            "sampling_mode": sampling_meta.get("sampling_mode"),
+            "difficulty_bucket": sampling_meta.get("difficulty_bucket"),
+            "obstacle_case": sampling_meta.get("obstacle_case"),
+        },
         "source": {
             "result_json": str(result_path),
             "planner_run_json": str(_artifact_path(result, result_path, "planner_run_json", "planner_run.json")),
@@ -294,6 +308,12 @@ def _write_manifest(
         "request_count": len(request_ids),
         "sample_count": len(samples),
         "candidate_count": len(samples),
+        "split_counts": dict(
+            Counter(
+                str((sample.get("sampling") or {}).get("split") or "unknown")
+                for sample in samples
+            )
+        ),
         "candidate_with_points_count": sum(
             1 for sample in samples if sample.get("candidate", {}).get("trajectory", {}).get("points")
         ),
@@ -323,12 +343,35 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=Path("runs/diffusion_seed_learning/candidate_samples.jsonl"))
     parser.add_argument("--manifest-out", type=Path)
     parser.add_argument("--dataset-name", default="standalone_candidate_dataset")
+    parser.add_argument(
+        "--split",
+        default=None,
+        help="C0c: keep only samples whose problem-level split matches (e.g. "
+        "'train'). Comma-separated for multiple. Default: keep all splits. "
+        "Training exports MUST pass --split train to avoid test leakage.",
+    )
     args = parser.parse_args(argv)
+
+    keep_splits = None
+    if args.split:
+        keep_splits = {s.strip() for s in str(args.split).split(",") if s.strip()}
 
     result_files = _iter_result_files(args.input)
     samples: list[dict[str, Any]] = []
+    dropped_by_split = 0
     for path in result_files:
-        samples.extend(_samples_from_result(path, args.dataset_name))
+        for sample in _samples_from_result(path, args.dataset_name):
+            if keep_splits is not None:
+                if str((sample.get("sampling") or {}).get("split") or "unknown") not in keep_splits:
+                    dropped_by_split += 1
+                    continue
+            samples.append(sample)
+    if keep_splits is not None:
+        print(
+            f"[split-filter] kept splits={sorted(keep_splits)}; "
+            f"dropped {dropped_by_split} out-of-split samples",
+            file=sys.stderr,
+        )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w", encoding="utf-8") as handle:

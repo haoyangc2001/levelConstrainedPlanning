@@ -454,6 +454,24 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
     from level_planner_core import LevelConstrainedPlanner
 
     requests = load_requests(args.requests)
+    # C0c: restrict evaluation to a problem-level split (e.g. `test`) so the
+    # paper's headline comparison never touches train/val problems. Requests
+    # carry their split at metadata.sampling.split (sample_tasks.py); legacy
+    # requests with no split label are kept only when no --split is requested.
+    keep_splits = None
+    if getattr(args, "split", None):
+        keep_splits = {s.strip() for s in str(args.split).split(",") if s.strip()}
+        before = len(requests)
+        requests = [
+            req
+            for req in requests
+            if str(((req.get("metadata") or {}).get("sampling") or {}).get("split") or "unknown")
+            in keep_splits
+        ]
+        print(
+            f"[split-filter] keep={sorted(keep_splits)}: {len(requests)}/{before} requests retained",
+            flush=True,
+        )
     selected = requests[int(args.offset):]
     if args.limit is not None:
         selected = selected[: int(args.limit)]
@@ -599,6 +617,7 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
         "requests": str(args.requests),
         "config": str(args.config),
         "out_dir": str(args.out_dir),
+        "eval_split": args.split,  # C0c: which problem-level split was evaluated
         "method_order": methods,
         "strategy_order": methods,  # backward-compat alias
         "request_count": len(selected),
@@ -696,6 +715,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--limit", type=int)
+    parser.add_argument(
+        "--split",
+        default=None,
+        help="C0c: evaluate only requests whose problem-level split matches "
+        "(e.g. 'test'). Comma-separated for multiple. The paper's headline "
+        "comparison MUST pass --split test.",
+    )
     parser.add_argument("--resume", action="store_true")
     # A3.1/A3.2: sweep axes.
     parser.add_argument(

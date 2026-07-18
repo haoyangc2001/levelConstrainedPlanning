@@ -46,6 +46,11 @@ class LevelPlannerConfig:
     robot_config: str = "configs/robot/xms5_r800_w4g3b4c_v2.yml"
     obstacle_json: str = "configs/obstacles/abs.autosave.json"
     obstacle_rel_json: str | None = "configs/obstacles/rel.autosave.json"
+    # C0b: when True, plan() reloads the CuRobo world per request from
+    # request["world"]["sampled_obstacles"] (a box list) so obstacle density is a
+    # real experimental axis rather than a stratification label. Off by default so
+    # the standalone single-world deployment path is unchanged.
+    per_request_world: bool = False
     device: str = "cuda:0"
     collision_cache_obb: int = 16
     use_cuda_graph: bool = True
@@ -108,6 +113,7 @@ class LevelPlannerConfig:
             "device",
             "collision_cache_obb",
             "use_cuda_graph",
+            "per_request_world",
             "warmup_iterations",
             "max_attempts",
             "num_candidates",
@@ -259,6 +265,51 @@ class LevelConstrainedPlanner:
             LOGGER.warning("collision checker unavailable, collision check degraded: %s", exc)
             return None
 
+    def _reload_world_for_request(self, request: dict[str, Any]) -> None:
+        """C0b: swap the CuRobo world to the request's sampled obstacle layout.
+
+        Only active when ``config.per_request_world`` is True. Reads a box list
+        from ``request["world"]["sampled_obstacles"]`` (the sampler's
+        ``OBSTACLE_LAYOUTS`` schema: ``{"name","position","dims"}`` per box),
+        converts it to CuRobo cuboids, calls ``update_world``, refreshes the world
+        summary + collision checker so the A1 collision gate measures against the
+        *actual* per-request obstacles. Falls back to the config world when the
+        request carries no explicit layout (so density becomes a real axis without
+        breaking requests that predate C0b).
+        """
+        from curobo.scene import Scene as SceneCfg
+
+        from .world import make_world_from_boxes
+
+        world_req = dict(request.get("world") or {})
+        if "sampled_obstacles" not in world_req:
+            return  # no per-request layout; keep whatever world is loaded.
+        raw_boxes = world_req.get("sampled_obstacles") or []
+        boxes: list[dict[str, Any]] = []
+        for index, box in enumerate(raw_boxes):
+            name = str(box.get("name") or f"req_box_{index}")
+            dims = [float(v) for v in box.get("dims", [])]
+            if "pose" in box:
+                pose = [float(v) for v in box["pose"]]
+            else:
+                position = [float(v) for v in box.get("position", [0.0, 0.0, 0.0])]
+                # sampler layouts are axis-aligned: identity quaternion (w,x,y,z).
+                quat = [float(v) for v in box.get("orientation", [1.0, 0.0, 0.0, 0.0])]
+                pose = position + quat
+            if len(dims) != 3 or len(pose) != 7:
+                continue
+            boxes.append({"name": name, "dims": dims, "pose": pose})
+        world_dict = make_world_from_boxes(boxes)
+        self._planner.update_world(SceneCfg.create(world_dict))
+        self._world_summary = {
+            "abs_count": len(boxes),
+            "rel_count": 0,
+            "total_count": len(boxes),
+            "source": "per_request",
+            "obstacle_case": world_req.get("sampled_obstacle_case"),
+        }
+        self._collision_checker = self._build_collision_checker()
+
     def _evaluate_collision(self, trajectory_points: list[list[float]]) -> dict[str, Any] | None:
         """A1.2: measure the along-path world collision cost for a trajectory.
 
@@ -309,6 +360,8 @@ class LevelConstrainedPlanner:
         normalized: dict[str, Any] | None = None
         try:
             normalized = self._normalize_request(request)
+            if self.config.per_request_world:
+                self._reload_world_for_request(request if isinstance(request, dict) else {})
             seed_reports = self._run_seed_providers(normalized)
             result = self._plan_with_control_flow(
                 request_id=request_id,

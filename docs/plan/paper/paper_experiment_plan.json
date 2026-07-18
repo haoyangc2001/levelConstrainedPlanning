@@ -439,8 +439,8 @@
         {
           "id": "C0a",
           "description": "A1 门 (硬前置)：在生成任何 C 数据前，确认 Phase A 的 A1 碰撞回放已落地 (collision_safety 能发出 failure_reason)。否则正样本碰撞盲。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "A1"
           ],
@@ -450,13 +450,14 @@
           "files": [
             "level_planner_core/validators.py"
           ],
-          "uncertainty": "无——是校验门。"
+          "uncertainty": "无——是校验门。",
+          "result_note": "A1 门确认通过: 冒烟(B5/B3c)候选记录中 collision_safety checked=True, status∈{safe,collision}, 碰撞时 failure_reason=collision_detected 且带真实有符号距离(如 -0.0075m/-0.0092m); 空世界正确降级 unchecked/no_obstacles。正样本不再碰撞盲。"
         },
         {
           "id": "C0b",
           "description": "per-request 世界应用 (障碍密度轴的前置)：把 request['world'].sampled_obstacles 接进 _normalize_request 并 per-request (或按 obstacle_case 分组) 调用 update_world。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [],
           "details": [
             "未做前，障碍密度只能当分层标签，不得声称密度覆盖。",
@@ -470,8 +471,8 @@
         {
           "id": "C0c",
           "description": "冻结 train/val/test 划分 (反自证循环 + 独立留出集)：现无任何 split——export_core_results_dataset.py 按 run_dir 收全部候选进 train，C4 所谓『留出集』实例级并不 disjoint。须在实例(问题)级冻结 disjoint 的 train/val/test，训练只见 train、C4/E2 只在 test 上评。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [],
           "details": [
             "在采样阶段给每个 base-problem 分配 split_id 并持久化 (确保同一问题的所有候选落同一 split，避免泄漏)。",
@@ -490,8 +491,8 @@
         {
           "id": "C1a",
           "description": "采样器：真实独立 start/goal (现为单基准 jitter)：把 sample_tasks.py:189-203 的单基准抖动换成独立随机 start_joint + 可达 target_pose 采样 (含可达/IK 预检过滤)，或一组足够宽的 base 位姿库。产出真正多样的 100 对/类。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [],
           "details": [
             "可与 A 并行起草，但数据实跑等 A1。"
