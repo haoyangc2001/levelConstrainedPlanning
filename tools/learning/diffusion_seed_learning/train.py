@@ -13,9 +13,10 @@ import torch
 from torch.utils.data import DataLoader
 
 from dataset import DEFAULT_VALIDATED_SAMPLES, TrajectorySeedDataset
-from diffusion import GaussianDiffusion1D
+from diffusion import AuxLossConfig, GaussianDiffusion1D
 from model_unet1d import TemporalUNet1D
 from artifact_paths import public_root
+from level_planner_core.condition import CONDITION_DIM_WITH_CLASS
 
 
 DEFAULT_CHECKPOINT_DIR = public_root() / "checkpoints/standalone_sr5_diffusion"
@@ -40,7 +41,53 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--diffusion-steps", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--device", type=str, default="cuda:0")
+    # C3b switchable auxiliary loss components (OFF by default => pure MSE, the
+    # main model enables L_level; C5 ablates each one back off for a variant).
+    parser.add_argument("--enable-l-level", action="store_true",
+                        help="Add differentiable alignment-deviation penalty (L_level).")
+    parser.add_argument("--enable-l-collision", action="store_true",
+                        help="Add collision-cost guidance penalty (L_collision; needs A1).")
+    parser.add_argument("--level-weight", type=float, default=0.1,
+                        help="Weight of L_level when enabled (deg^2 penalty scale).")
+    parser.add_argument("--collision-weight", type=float, default=0.1,
+                        help="Weight of L_collision when enabled.")
+    parser.add_argument("--planner-config", type=Path, default=Path("configs/sr5_level.yaml"),
+                        help="Planner config used to build FK/collision callbacks for aux losses.")
     return parser.parse_args()
+
+
+def build_aux(args, dataset, device) -> AuxLossConfig | None:
+    """Construct the C3b AuxLossConfig, or None when no aux term is enabled.
+
+    Only when a term is enabled do we import curobo / instantiate the planner,
+    so pure-MSE training keeps zero curobo dependency."""
+    if not (args.enable_l_level or args.enable_l_collision):
+        return None
+    from level_planner_core.planner import LevelConstrainedPlanner
+    from aux_guidance import make_alignment_angle_fn, make_collision_cost_fn
+
+    planner = LevelConstrainedPlanner.from_config(str(args.planner_config))
+    # move normalization to the training device for the denormaliser
+    mean = dataset.normalization.mean.to(device)
+    std = dataset.normalization.std.clamp_min(1e-6).to(device)
+
+    def denormalize(x: torch.Tensor) -> torch.Tensor:
+        return x * std + mean
+
+    tolerance_deg = float(getattr(planner.config, "level_tolerance_deg", 3.0))
+    level_index = 15 if dataset.condition_dim == CONDITION_DIM_WITH_CLASS else None
+    aux = AuxLossConfig(
+        enable_l_level=bool(args.enable_l_level),
+        enable_l_collision=bool(args.enable_l_collision),
+        level_weight=float(args.level_weight) if args.enable_l_level else 0.0,
+        collision_weight=float(args.collision_weight) if args.enable_l_collision else 0.0,
+        tolerance_deg=tolerance_deg,
+        level_active_index=level_index,
+        denormalize=denormalize,
+        alignment_angle_fn=make_alignment_angle_fn(planner) if args.enable_l_level else None,
+        collision_cost_fn=make_collision_cost_fn(planner) if args.enable_l_collision else None,
+    )
+    return aux
 
 
 def main() -> None:
@@ -56,24 +103,40 @@ def main() -> None:
     diffusion_config = {"steps": args.diffusion_steps}
     model = TemporalUNet1D(**model_config).to(device)
     diffusion = GaussianDiffusion1D(**diffusion_config).to(device)
+    aux = build_aux(args, dataset, device)
+    aux_config_record = {
+        "enable_l_level": bool(args.enable_l_level),
+        "enable_l_collision": bool(args.enable_l_collision),
+        "level_weight": float(args.level_weight) if args.enable_l_level else 0.0,
+        "collision_weight": float(args.collision_weight) if args.enable_l_collision else 0.0,
+        "tolerance_deg": float(aux.tolerance_deg) if aux else None,
+        "active": bool(aux.active) if aux else False,
+    }
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     best_loss = float("inf")
     history = []
     args.out_dir.mkdir(parents=True, exist_ok=True)
     for epoch in range(1, args.epochs + 1):
         losses = []
+        comp_accum: dict[str, float] = {}
         model.train()
         for batch in loader:
             x0 = batch["trajectory"].to(device)
             condition = batch["condition"].to(device)
-            loss = diffusion.training_loss(model, x0, condition)
+            loss, components = diffusion.training_loss(
+                model, x0, condition, aux, return_components=True
+            )
             optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
             losses.append(float(loss.item()))
+            for key, value in components.items():
+                comp_accum[key] = comp_accum.get(key, 0.0) + value
         epoch_loss = sum(losses) / max(len(losses), 1)
-        history.append({"epoch": epoch, "loss": epoch_loss})
+        n_batches = max(len(losses), 1)
+        comp_mean = {key: value / n_batches for key, value in comp_accum.items()}
+        history.append({"epoch": epoch, "loss": epoch_loss, "components": comp_mean})
         checkpoint = {
             "model_state_dict": model.state_dict(),
             "model_config": model_config,
@@ -82,6 +145,7 @@ def main() -> None:
             "horizon": args.horizon,
             "samples_path": str(args.samples),
             "samples_sha256": sha256_file(args.samples),
+            "aux_loss_config": aux_config_record,
             "schema_version": "diffusion_seed_checkpoint.v1",
         }
         torch.save(checkpoint, args.out_dir / "last.pt")
@@ -112,6 +176,7 @@ def main() -> None:
         "diffusion_steps": args.diffusion_steps,
         "best_loss": best_loss,
         "history": history,
+        "aux_loss_config": aux_config_record,
         "profile": "sr5",
         "constraint": "tool1 y+ -> world z-",
     }

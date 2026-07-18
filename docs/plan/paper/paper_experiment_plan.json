@@ -630,8 +630,8 @@
         {
           "id": "C3b",
           "description": "实现消融所需的训练损失组件 (反 over-claim)：diffusion.py 现为纯 MSE，无 L_level / L_collision guidance；若 Method/消融要声称『对齐损失/碰撞引导/多样性筛选』的贡献，须先真正实现这些开关，否则 D5 第6档消融依赖不存在的组件、Method over-claim。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [],
           "details": [
             "在 diffusion 训练加可开关的 L_level (轨迹对齐偏差惩罚) 与 (依赖 A1) L_collision guidance；多样性筛选作为 critic/选择器侧开关。",
@@ -644,7 +644,8 @@
             "tools/learning/diffusion_seed_learning/critic.py"
           ],
           "uncertainty": "中——L_level 直接；L_collision 依赖 A1 的可微/可评估碰撞。",
-          "review_change": "审查：新增 C3b 真正实现 L_level/L_collision/多样性开关，否则 D5 第6档消融与 Method 声称未实现组件 (diffusion.py 现纯 MSE)。"
+          "review_change": "审查：新增 C3b 真正实现 L_level/L_collision/多样性开关，否则 D5 第6档消融与 Method 声称未实现组件 (diffusion.py 现纯 MSE)。",
+          "implementation_note": "Switchable auxiliary loss components landed in diffusion.py (AuxLossConfig + training_loss) and train.py (--enable-l-level/--enable-l-collision, +weights, aux_loss_config recorded in checkpoint & metadata). L_level = differentiable relu(alignment_angle_deg - tolerance)^2 via autograd cuRobo FK (aux_guidance.make_alignment_angle_fn), masked to level_active==1 samples. L_collision = penalty on positive world-collision cost (A1 shared query; non-differentiable lookup, documented as cost signal not gradient). aux=None => bit-identical base MSE (verified). Critic-side diversity selection (select_diverse_topk) already existed. Verified end-to-end 1-epoch with real FK on c2_keeplevel."
         },
         {
           "id": "C4",
