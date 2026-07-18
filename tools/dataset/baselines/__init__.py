@@ -23,6 +23,7 @@ from __future__ import annotations
 # broken/optional baseline (e.g. one needing an unavailable external dep) does
 # not prevent the others from registering.
 from . import curobo_soft_cost as _curobo_soft_cost  # noqa: F401
+from . import chomp_constraint as _chomp_constraint  # noqa: F401
 
 # OMPL-backed baselines need the optional
 # ``ompl`` wheel. Guard the import so hosts without it still load the other
@@ -37,4 +38,4 @@ except Exception as _exc:  # pragma: no cover - depends on host env
     _OMPL_IMPORT_ERROR = f"{type(_exc).__name__}: {_exc}"
     _OMPL_BASELINES = []
 
-__all__ = ["_curobo_soft_cost", *_OMPL_BASELINES]
+__all__ = ["_curobo_soft_cost", "_chomp_constraint", *_OMPL_BASELINES]

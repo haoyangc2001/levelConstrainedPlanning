@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tools.dataset.baselines import ompl_bridge
+from tools.dataset.baselines.chomp_constraint import ChompConfig, _initial_trajectory, _iteration_budget
 from tools.dataset.baselines.ompl_rrtc import _solve_time_budget
 from tools.dataset.methods import get_method
 
@@ -36,3 +37,21 @@ def test_ompl_rrtc_registered_as_external_method() -> None:
     assert spec.external
     assert spec.runner is not None
 
+
+def test_chomp_initial_trajectory_preserves_fixed_endpoints() -> None:
+    trajectory = _initial_trajectory([0.0, 1.0], [2.0, 3.0], 5, "cpu")
+    assert trajectory.shape == (5, 2)
+    assert trajectory[0].tolist() == [0.0, 1.0]
+    assert trajectory[-1].tolist() == [2.0, 3.0]
+
+
+def test_chomp_iteration_budget_scales_and_caps() -> None:
+    cfg = ChompConfig(iterations_per_budget=10, max_iterations=25)
+    assert _iteration_budget({"metadata": {"compute_budget_solve_calls": 2}}, cfg) == 20
+    assert _iteration_budget({"metadata": {"compute_budget_solve_calls": 9}}, cfg) == 25
+
+
+def test_chomp_registered_as_external_method() -> None:
+    spec = get_method("baseline/chomp_constraint")
+    assert spec.external
+    assert spec.runner is not None

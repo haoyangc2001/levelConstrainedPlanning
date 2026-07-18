@@ -329,8 +329,8 @@
         {
           "id": "B3c",
           "description": "经典约束优化 baseline (用户决策新增，反 strawman)：CHOMP / GPMP2 / TrajOpt-TSR 一类把水平当硬约束(TSR/流形投影或约束代价)的经典轨迹优化对手，产出 CandidateRecord 过同一验收器。确保 Table I『constraint-enforcing optimization』格非空、E1 至少有一个真正的约束求解对手(区别于 B2 自认稻草人的 soft-cost 与 B3a 无约束地板)。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "B0",
             "B1",
@@ -345,8 +345,9 @@
             "新经典约束优化 adapter 模块",
             "tools/dataset/run_closed_loop_benchmark.py"
           ],
-          "uncertainty": "中——取决于 B1 的借用结论；GPMP2/CHOMP 有现成实现则成本可控。",
-          "review_change": "审查+用户决策：新增 B3c 经典约束优化 baseline，反 strawman，与 B5 共同承担约束强制型对手角色。"
+          "uncertainty": "已解除：采用 B1 约定的纯 torch 最小 CHOMP-style 复现，不依赖 GPMP2/外部构建。",
+          "review_change": "审查+用户决策：新增 B3c 经典约束优化 baseline，反 strawman，与 B5 共同承担约束强制型对手角色。",
+          "completion_note": "B3c 完成 (2026-07-18)。新增 baseline/chomp_constraint：固定 start/goal 的 joint trajectory，优化速度+加速度平滑项、所有 waypoint 的 level tolerance violation、以及 A1 RobotCollisionChecker 的可微 world activation cost；关节变量每步 clamp 到 URDF limits，compute budget 映射为迭代数，timeout 为统一 guard。CuRobo V2 self-collision CUDA backward 对 [B,T,1] 有维度缺陷，因此本 baseline 与 A1 统一口径，仅对 world collision cost 求梯度，最终仍由共享 hard validator 全量验收。输出通过 ompl_bridge 的统一外部结果契约、URDF velocity-limit retiming 和 paper benchmark。新增 3 个 CHOMP 初始化/预算/注册单测，项目 27 tests 全绿。A100 easy smoke(K=2)：3.79s，max alignment=13.438° <=15°，collision safe，dimensioned=true，最终 success；strict/hard smoke(K=4,3°) 未收敛且碰撞，统一硬门正确返回 failed_hard_validation。该正负样本证明 baseline 能执行约束优化且没有私有成功定义。"
         },
         {
           "id": "B4",
