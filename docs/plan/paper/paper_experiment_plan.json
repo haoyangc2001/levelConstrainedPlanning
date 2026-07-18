@@ -534,8 +534,8 @@
         {
           "id": "C2",
           "description": "keep-level-only 首轮 scale-up 到 3000+ (A1 后即可，today 可达)：现管线已能从少量请求产出大量候选。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "C0a",
             "C0c",
@@ -553,7 +553,35 @@
             "tools/dataset/validate_candidate_dataset.py",
             "tools/dataset/write_dataset_pointer.py"
           ],
-          "uncertainty": "A1 后正样本有效率下降幅度未知，可能需显著加请求数。"
+          "uncertainty": "A1 后正样本有效率下降幅度未知，可能需显著加请求数。",
+          "result": {
+            "run_dir": "runs/c2_keeplevel",
+            "requests": 6000,
+            "constraint_classes": [
+              "LP",
+              "LPO"
+            ],
+            "difficulty": "mixed",
+            "obstacle_case": "mixed (none/single/multi balanced 1000 each per class)",
+            "split_frozen": "C0c (train 4221 / val 610 / test 1169)",
+            "train_samples": 54952,
+            "train_positive_for_diffusion": 3196,
+            "train_positive_for_critic": 1069,
+            "train_negative_for_critic": 53883,
+            "val_samples": 7964,
+            "val_positive_for_diffusion": 441,
+            "source_type_counts": {
+              "diffusion_seed": 16884,
+              "planner_native": 12744,
+              "rule_raw_seed": 12662,
+              "rule_seed": 12662
+            },
+            "validation": "valid=true (require-positive+require-negative passed)",
+            "dataset_pointer": "runs/c2_keeplevel/dataset_pointer.json",
+            "positives_per_train_request": 0.748,
+            "note": "train-split-only export prevents test leakage; test split (1169 req) reserved for C4/E2. positive_for_diffusion==validator_valid depends on A1 collision replay (active)."
+          },
+          "uncertainty_resolved": "A1 后有效率实测 0.748 pos/train-req (blend LPO×mixed×obstacle 0.786)；6000 请求得 3196 train 正样本，>3000 目标达成。"
         },
         {
           "id": "C2b",
