@@ -614,7 +614,7 @@
           "details": [
             "train.py --epochs 240 --batch-size 64 --hidden-dim 128 --diffusion-steps 64 --horizon 32 --samples <new>。",
             "train_critic.py --epochs 160 --batch-size 64 --hidden-dim 128 --horizon 32 --samples <new>。",
-            "启用 C3b 的 L_level (与 A1 后的 L_collision guidance) 作为主模型配置——主模型即『全组件』档，供 C5 逐个关做消融。",
+            "主『全组件』模型只启用 C3b 的 L_level（可微 FK 对齐损失，梯度真回传）作为唯一训练用辅助损失；L_collision 因 detached-标量零梯度被降级为『验证期 A1』而非训练损失（反 over-claim）。供 C5 关 L_level 做消融。",
             "register_model_artifacts.py + write_dataset_pointer.py 更新指针。",
             "只吃 C0c 的 train split；若 C1b 改了 condition_dim/input_dim，是全新训练。"
           ],
@@ -625,7 +625,8 @@
             "tools/learning/diffusion_seed_learning/register_model_artifacts.py",
             "tools/dataset/write_dataset_pointer.py"
           ],
-          "uncertainty": "batch 须按正样本数校准 (DataLoader clamp)。"
+          "uncertainty": "batch 须按正样本数校准 (DataLoader clamp)。",
+          "l_collision_descope_note": "C3b 复核：L_level 走 cuRobo 可微 FK，梯度真回传（已 smoke 验证）；但 aux_guidance.make_collision_cost_fn 经 planner._evaluate_collision 做了 .detach().cpu().tolist() 再 torch.full 重建标量 → 零梯度、对权重无作用。按反 over-claim：主『全组件』模型只训 L_level；collision-awareness 真实存在但在 A1 验证期（validators._evaluate_collision）生效，非 diffusion 训练损失。故 C5 消融只关唯一真训练开关 L_level，不得声称切换已训练的 L_collision 损失。见 memory lcp-c3-lcollision-nondifferentiable。"
         },
         {
           "id": "C3b",
@@ -645,7 +646,8 @@
           ],
           "uncertainty": "中——L_level 直接；L_collision 依赖 A1 的可微/可评估碰撞。",
           "review_change": "审查：新增 C3b 真正实现 L_level/L_collision/多样性开关，否则 D5 第6档消融与 Method 声称未实现组件 (diffusion.py 现纯 MSE)。",
-          "implementation_note": "Switchable auxiliary loss components landed in diffusion.py (AuxLossConfig + training_loss) and train.py (--enable-l-level/--enable-l-collision, +weights, aux_loss_config recorded in checkpoint & metadata). L_level = differentiable relu(alignment_angle_deg - tolerance)^2 via autograd cuRobo FK (aux_guidance.make_alignment_angle_fn), masked to level_active==1 samples. L_collision = penalty on positive world-collision cost (A1 shared query; non-differentiable lookup, documented as cost signal not gradient). aux=None => bit-identical base MSE (verified). Critic-side diversity selection (select_diverse_topk) already existed. Verified end-to-end 1-epoch with real FK on c2_keeplevel."
+          "implementation_note": "Switchable auxiliary loss components landed in diffusion.py (AuxLossConfig + training_loss) and train.py (--enable-l-level/--enable-l-collision, +weights, aux_loss_config recorded in checkpoint & metadata). L_level = differentiable relu(alignment_angle_deg - tolerance)^2 via autograd cuRobo FK (aux_guidance.make_alignment_angle_fn), masked to level_active==1 samples. L_collision = penalty on positive world-collision cost (A1 shared query; non-differentiable lookup, documented as cost signal not gradient). aux=None => bit-identical base MSE (verified). Critic-side diversity selection (select_diverse_topk) already existed. Verified end-to-end 1-epoch with real FK on c2_keeplevel.",
+          "l_collision_gradient_correction": "复核修正：L_collision 虽实现为 --enable-l-collision，但经 detach().cpu().tolist() 重建标量 => 零梯度，作训练损失对权重无作用。故它不是有效的可训练消融轴；仅 L_level 是真训练开关。多样性筛选是 critic 推理期开关。见 C3 l_collision_descope_note 与 memory lcp-c3-lcollision-nondifferentiable。"
         },
         {
           "id": "C4",
@@ -680,8 +682,10 @@
             "C3b"
           ],
           "details": [
-            "对每个 --enable-xxx 关一个重训 (warm-start 或全新，视 condition_dim 是否变)。",
-            "每个变体注册独立 artifact 指针，供 D5 逐档跑 benchmark。",
+            "唯一可训练的辅助损失开关是 L_level：关掉 --enable-l-level 全新重训一个 base-MSE 变体 (condition_dim 未变，可 warm-start 或全新)。",
+            "多样性筛选 (critic select_diverse_topk diversity_weight) 是推理期开关，无需重训：同一 checkpoint 关/开 diversity_weight 各跑一档即可。",
+            "L_collision 不作为训练损失消融档：它是 detached-标量零梯度、对权重无作用 (见 C3 l_collision_descope_note)；碰撞感知在 A1 验证期真实生效，不构成可训练变体。从 D5 消融删除该档。",
+            "每个真实变体注册独立 artifact 指针，供 D5 逐档跑 benchmark。",
             "只在 train split 训、test split 评 (与 C0c 一致)。"
           ],
           "files": [
@@ -690,7 +694,7 @@
             "tools/learning/diffusion_seed_learning/register_model_artifacts.py"
           ],
           "uncertainty": "中——算力随变体数线性增；D5 第6档硬依赖它。",
-          "review_change": "审查：新增 C5 组件消融重训，D5 第6档从『依赖不存在的模型』变为有真实变体 checkpoint。"
+          "review_change": "审查：C5 消融轴校正为『L_level 训练损失关/开』+『critic 多样性筛选推理期关/开』两条真实轴；L_collision 因零梯度从训练消融删除 (反 over-claim)。"
         }
       ]
     },
