@@ -32,8 +32,9 @@ from . import chomp_constraint as _chomp_constraint  # noqa: F401
 _OMPL_IMPORT_ERROR: str | None = None
 try:
     from . import ompl_rrtc as _ompl_rrtc  # noqa: F401
+    from . import ompl_projection as _ompl_projection  # noqa: F401
 
-    _OMPL_BASELINES = ["_ompl_rrtc"]
+    _OMPL_BASELINES = ["_ompl_rrtc", "_ompl_projection"]
 except Exception as _exc:  # pragma: no cover - depends on host env
     _OMPL_IMPORT_ERROR = f"{type(_exc).__name__}: {_exc}"
     _OMPL_BASELINES = []

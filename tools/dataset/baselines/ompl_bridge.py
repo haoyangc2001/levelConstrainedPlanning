@@ -104,8 +104,15 @@ def make_state(space_info: Any, values: list[float], dof: int) -> Any:
     (the constrained state is likewise index-assignable over the ambient DOF).
     """
     state = space_info.allocState()
-    for i in range(dof):
-        state[i] = float(values[i])
+    vector = [float(values[i]) for i in range(dof)]
+    # Plain RealVector states expose item assignment.  Constrained states in the
+    # OMPL 2.0.1 nanobind wheel are readable by index but assignment is omitted;
+    # their ``copy(sequence)`` method is the supported initialization path.
+    try:
+        for i, value in enumerate(vector):
+            state[i] = value
+    except TypeError:
+        state.copy(vector)
     return state
 
 
@@ -192,57 +199,348 @@ def alignment_angle_deg(planner: Any, config: list[float], local_axis: list[floa
     return float(angle.reshape(-1)[0].item())
 
 
-def make_level_constraint(planner: Any, normalized_request: dict[str, Any]) -> Any:
-    """Build an ``ompl.base.Constraint`` for ``c(q) = align_angle(q) (radians)``.
+def _alignment_tangent_basis(target_axis: list[float], device: str) -> tuple[torch.Tensor, torch.Tensor]:
+    target = torch.tensor(target_axis, device=device, dtype=torch.float32)
+    target = target / torch.linalg.norm(target).clamp_min(1.0e-8)
+    reference = torch.tensor([1.0, 0.0, 0.0], device=device)
+    if float(torch.abs(torch.dot(target, reference)).item()) > 0.9:
+        reference = torch.tensor([0.0, 1.0, 0.0], device=device)
+    tangent_1 = torch.linalg.cross(target, reference)
+    tangent_1 = tangent_1 / torch.linalg.norm(tangent_1).clamp_min(1.0e-8)
+    tangent_2 = torch.linalg.cross(target, tangent_1)
+    tangent_2 = tangent_2 / torch.linalg.norm(tangent_2).clamp_min(1.0e-8)
+    return tangent_1, tangent_2
 
-    The projection space drives the residual to zero (perfect alignment), which
-    is stricter than ``<= tolerance`` and therefore a faithful *hard-constraint*
-    adversary: every projected state sits on the level manifold. ``function``
-    returns the alignment angle in **radians** (OMPL projects toward 0);
-    ``jacobian`` is left to OMPL's finite differencing.
+
+def alignment_tangent_residual(
+    planner: Any,
+    q: torch.Tensor,
+    local_axis: list[float],
+    target_axis: list[float],
+) -> torch.Tensor:
+    """Two smooth equality residuals for axis alignment."""
+    local = torch.tensor(local_axis, device=q.device, dtype=torch.float32)
+    tangent_1, tangent_2 = _alignment_tangent_basis(target_axis, str(q.device))
+    fk = planner._constraint_eval_kinematics_fn(q)
+    quaternion = constraints.extract_ee_quaternion_batched(fk)
+    rotation = constraints.quaternion_to_rotation_matrix_batched(quaternion)
+    axis_world = torch.matmul(rotation, local.reshape(1, 3, 1)).squeeze(-1)
+    return torch.stack(
+        [axis_world @ tangent_1, axis_world @ tangent_2],
+        dim=-1,
+    )
+
+
+def make_level_constraint(planner: Any, normalized_request: dict[str, Any]) -> Any:
+    """Build an OMPL projection residual for the level inequality.
+
+    The two residuals are the tool axis components along an orthonormal tangent
+    basis of the target axis.  Driving both to zero yields the axis-alignment
+    equality manifold with a smooth rank-2 Jacobian.  A separate validity check
+    rejects the anti-parallel branch.  An autograd Jacobian avoids slow/noisy
+    finite differencing through GPU forward kinematics.
     """
     require_ompl()
     dof = len(planner._joint_names)
-    local_axis, target_axis, _ = _alignment_axes(normalized_request, planner)
+    local_axis, target_axis, tolerance_deg = _alignment_axes(normalized_request, planner)
 
     class LevelConstraint(ob.Constraint):
         def __init__(self) -> None:
-            super().__init__(dof, 1)
+            super().__init__(dof, 2)
+            # OMPL accepts a tube around the equality manifold.  For unit axes,
+            # the tangent residual norm is sin(angle), so this exactly maps the
+            # request's angular tolerance to the projection tolerance and avoids
+            # perturbing already-valid service states.
+            self.setTolerance(max(math.sin(math.radians(tolerance_deg)), 1.0e-4))
 
         def function(self, x, out) -> None:  # noqa: N802 (OMPL API name)
-            config = [float(x[i]) for i in range(dof)]
-            out[0] = math.radians(alignment_angle_deg(planner, config, local_axis, target_axis))
+            q = torch.tensor(
+                [[float(x[i]) for i in range(dof)]],
+                device=planner.device,
+                dtype=torch.float32,
+            )
+            residual = alignment_tangent_residual(
+                planner, q, local_axis, target_axis
+            ).reshape(-1).detach().cpu()
+            out[0] = float(residual[0].item())
+            out[1] = float(residual[1].item())
+
+        def jacobian(self, x, out) -> None:  # noqa: N802 (OMPL API name)
+            q = torch.tensor(
+                [[float(x[i]) for i in range(dof)]],
+                device=planner.device,
+                dtype=torch.float32,
+                requires_grad=True,
+            )
+            residual = alignment_tangent_residual(planner, q, local_axis, target_axis).reshape(-1)
+            for row in range(2):
+                gradient = torch.autograd.grad(
+                    residual[row], q, retain_graph=row == 0
+                )[0].reshape(-1).detach().cpu()
+                for index, value in enumerate(gradient.tolist()):
+                    out[row, index] = float(value)
 
     return LevelConstraint()
+
+
+def make_level_validity_checker(
+    planner: Any,
+    normalized_request: dict[str, Any],
+    dof: int,
+) -> Callable[[Any], bool]:
+    """Combine shared collision validity with the requested axis tolerance."""
+    collision_valid = make_validity_checker(planner, dof)
+    local_axis, target_axis, tolerance_deg = _alignment_axes(normalized_request, planner)
+
+    def is_valid(state: Any) -> bool:
+        if not collision_valid(state):
+            return False
+        config = [float(state[i]) for i in range(dof)]
+        return alignment_angle_deg(planner, config, local_axis, target_axis) <= tolerance_deg + 1.0e-3
+
+    return is_valid
+
+
+def _alignment_cos_residual(
+    planner: Any,
+    q: torch.Tensor,
+    local_axis: list[float],
+    target_axis: list[float],
+) -> torch.Tensor:
+    """Scalar residual ``r(q) = 1 - cos(angle)`` between tool axis and target.
+
+    ``r = 0`` iff the tool axis is parallel to the target (angle 0); ``r = 2`` at
+    anti-parallel (angle 180).  Monotonic in the alignment angle over [0, 180],
+    so descending it drives onto the *correct* (aligned) branch -- unlike the
+    two-tangent residual, which is also zero at the anti-parallel branch.
+    """
+    local = torch.tensor(local_axis, device=q.device, dtype=torch.float32)
+    target = torch.tensor(target_axis, device=q.device, dtype=torch.float32)
+    target = target / torch.linalg.norm(target).clamp_min(1.0e-8)
+    fk = planner._constraint_eval_kinematics_fn(q)
+    quaternion = constraints.extract_ee_quaternion_batched(fk)
+    rotation = constraints.quaternion_to_rotation_matrix_batched(quaternion)
+    axis_world = torch.matmul(rotation, local.reshape(1, 3, 1)).squeeze(-1)
+    axis_world = axis_world / torch.linalg.norm(axis_world, dim=-1, keepdim=True).clamp_min(1.0e-8)
+    cos_angle = (axis_world * target.reshape(1, 3)).sum(dim=-1)
+    return (1.0 - cos_angle).reshape(-1)
+
+
+def project_config_onto_level_manifold(
+    planner: Any,
+    config: list[float],
+    local_axis: list[float],
+    target_axis: list[float],
+    tolerance_deg: float,
+    *,
+    max_iterations: int = 80,
+    warm_start: list[float] | None = None,
+) -> tuple[list[float], float, bool]:
+    """Gauss-Newton-project a single joint config onto the level-alignment manifold.
+
+    This is the B5 constraint-enforcement primitive.  The OMPL 2.0.1 nanobind
+    wheel does not expose writable ``ProjectedStateSpace`` states nor a
+    registrable custom sampler, so manifold *search* is unavailable.  Instead B5
+    runs an unconstrained RRT-Connect (shared with B3b) and then projects every
+    waypoint onto the manifold here -- a standard, honest projection technique:
+    the returned trajectory satisfies ``angle <= tolerance`` by construction.
+
+    Descends the scalar residual ``r(q) = 1 - cos(angle)`` (``_alignment_cos_residual``,
+    monotonic in the alignment angle, so no anti-parallel branch) via a
+    Gauss-Newton direction ``d = -r * g / (g.g)`` with a **backtracking line
+    search**: the step is halved until the residual strictly decreases, which
+    prevents the small-gradient overshoot that otherwise climbs across ridges.
+    ``warm_start`` (the previous already-projected waypoint) seeds the descent so
+    a whole path is projected onto one continuous manifold branch.  Returns
+    ``(projected_config, final_angle_deg, converged)``.
+    """
+    tolerance_cos = 1.0 - math.cos(math.radians(max(0.0, float(tolerance_deg))))
+    target_residual = max(tolerance_cos * 0.5, 1.0e-6)
+
+    def residual_of(vec: list[float]) -> float:
+        q = torch.tensor([vec], device=planner.device, dtype=torch.float32)
+        return float(_alignment_cos_residual(planner, q, local_axis, target_axis)[0].item())
+
+    def descend(seed: list[float]) -> tuple[list[float], float]:
+        q = torch.tensor([list(map(float, seed))], device=planner.device, dtype=torch.float32)
+        r_value = residual_of(seed)
+        for _ in range(int(max_iterations)):
+            if r_value <= target_residual:
+                break
+            q_grad = q.detach().clone().requires_grad_(True)
+            residual = _alignment_cos_residual(planner, q_grad, local_axis, target_axis)
+            grad = torch.autograd.grad(residual[0], q_grad)[0].reshape(-1).detach()
+            denom = float((grad @ grad).item())
+            if denom < 1.0e-12:  # flat gradient -> nudge and retry
+                break
+            direction = -(r_value / denom) * grad
+            # Backtracking line search: shrink until the residual strictly drops.
+            step = 1.0
+            improved = False
+            for _bt in range(20):
+                candidate = (q + (step * direction).reshape(1, -1)).detach()
+                cand_r = float(
+                    _alignment_cos_residual(planner, candidate, local_axis, target_axis)[0].item()
+                )
+                if cand_r < r_value - 1.0e-9:
+                    q, r_value, improved = candidate, cand_r, True
+                    break
+                step *= 0.5
+            if not improved:
+                break
+        return [float(v) for v in q.reshape(-1).tolist()], r_value
+
+    # Try the warm start (path continuity) first, then the config itself; keep
+    # whichever reaches the smaller residual.
+    seeds = [config] if warm_start is None else [warm_start, config]
+    best_vec, best_r = None, float("inf")
+    for seed in seeds:
+        vec, r_value = descend(seed)
+        if r_value < best_r:
+            best_vec, best_r = vec, r_value
+    assert best_vec is not None
+    final_angle = alignment_angle_deg(planner, best_vec, local_axis, target_axis)
+    return best_vec, float(final_angle), bool(best_r <= target_residual)
+
+
+def project_path_onto_level_manifold(
+    planner: Any,
+    waypoints: list[list[float]],
+    normalized_request: dict[str, Any],
+    *,
+    pin_start: list[float] | None = None,
+    pin_goal: list[float] | None = None,
+    trust_radius_l2: float = 0.5,
+) -> tuple[list[list[float]], float]:
+    """Project every waypoint onto the level manifold; return (path, max_angle_deg).
+
+    ``pin_start`` (usually the request's exact ``start_joint``) replaces the
+    first waypoint after projection so the service start state is preserved
+    exactly.
+
+    ``trust_radius_l2`` caps how far each projected waypoint may move from its
+    already-projected predecessor (L2 in joint space).  Post-hoc projection of an
+    unconstrained path is otherwise free to send a waypoint into a *different* IK
+    branch / manifold basin than its neighbour -- e.g. a freshly IK-solved goal
+    config reaches the same tool pose as the path's terminal state but sits 4-5
+    rad away, which reappears as a single giant joint step and fails continuity.
+    Clamping each move to a trust region makes joint-step continuity hold
+    *by construction*; where the manifold is not reachable within the region the
+    waypoint stays partially aligned and the shared validator honestly records
+    the residual.  This is the principled fix for the basin-teleport artifact
+    (rather than pinning a foreign goal config, which recreates the jump).
+
+    A foreign ``pin_goal`` is intentionally NOT accepted: the RRT path already
+    terminates at the goal config continuously, so the trust-region-chained
+    endpoint reaches the goal pose without a discontinuity.  The returned
+    ``max_angle_deg`` is the worst per-waypoint alignment angle after projection;
+    the shared hard validator is the authority on success.
+    """
+    local_axis, target_axis, tolerance_deg = _alignment_axes(normalized_request, planner)
+    horizon = len(waypoints)
+    _ = pin_goal  # accepted for signature stability; deliberately unused (see docstring)
+    trust = max(1.0e-3, float(trust_radius_l2))
+
+    def _clamp_to_trust(new_config: list[float], previous: list[float] | None) -> list[float]:
+        if previous is None:
+            return new_config
+        delta = [n - p for n, p in zip(new_config, previous)]
+        dist = math.sqrt(sum(d * d for d in delta))
+        if dist <= trust or dist < 1.0e-12:
+            return new_config
+        scale = trust / dist
+        return [p + d * scale for p, d in zip(previous, delta)]
+
+    def project_once(points: list[list[float]]) -> tuple[list[list[float]], float]:
+        out: list[list[float]] = []
+        worst = 0.0
+        previous: list[float] | None = (
+            list(map(float, pin_start)) if pin_start is not None else None
+        )
+        for config in points:
+            new_config, _angle, _ = project_config_onto_level_manifold(
+                planner, config, local_axis, target_axis, tolerance_deg, warm_start=previous
+            )
+            new_config = _clamp_to_trust(new_config, previous)
+            # Re-measure the angle at the clamped config (the clamp may pull it
+            # slightly off the manifold; the validator scores the clamped point).
+            angle = alignment_angle_deg(planner, new_config, local_axis, target_axis)
+            out.append(new_config)
+            previous = new_config
+            worst = max(worst, float(angle))
+        return out, worst
+
+    # Iterate project -> arc-length resample -> project.  Projection moves each
+    # waypoint onto the manifold but can spread neighbours apart; arc-length
+    # resampling re-even-spaces them; re-projecting pulls the resampled points
+    # (which drift slightly off-manifold along the chord) back on.  Two to three
+    # rounds converge both the alignment angle and the joint-step continuity
+    # without any external dependency (the user-selected B5 convergence path).
+    projected, max_angle = project_once(waypoints)
+    for _ in range(2):
+        if pin_start is not None and projected:
+            projected[0] = list(map(float, pin_start))
+        resampled = _resample_path(projected, horizon, force=True)
+        projected, max_angle = project_once(resampled)
+
+    if pin_start is not None and projected:
+        projected[0] = list(map(float, pin_start))
+    return projected, float(max_angle)
 
 
 # ---------------------------------------------------------------------------
 # OMPL path -> planner result_dict (shared A1 collision + hard validator).
 # ---------------------------------------------------------------------------
-def _resample_path(waypoints: list[list[float]], horizon: int) -> list[list[float]]:
-    """Linearly resample a joint waypoint list to exactly ``horizon`` points."""
+def _resample_path(
+    waypoints: list[list[float]], horizon: int, *, force: bool = False
+) -> list[list[float]]:
+    """Resample a joint waypoint list to exactly ``horizon`` points by arc length.
+
+    Uniform-by-index interpolation preserves any clustering in the input (OMPL's
+    ``path.interpolate`` can return many near-duplicate states then one long
+    segment), which yields a trajectory with a single huge joint step and fails
+    the continuity validator.  Resampling by *cumulative joint-space distance*
+    spreads the output points evenly along the actual path, so every step is
+    ``total_arc_length / (horizon - 1)`` -- eliminating the giant-jump artifact.
+
+    ``force=True`` skips the length-equals-horizon pass-through.  That guard is
+    for on-manifold points a runner has *already* arc-length resampled (avoid
+    re-interpolating them off-manifold); it must NOT be taken for a raw OMPL path
+    that happens to already be ``horizon`` long but is internally clustered
+    (15 near-duplicate start states + 1 goal), which is exactly the giant-jump
+    case the runner needs re-spread.
+    """
     if not waypoints:
         return []
-    if len(waypoints) == horizon:
+    if len(waypoints) == horizon and not force:
+        # Already at horizon (e.g. runner pre-resampled then projected); pass
+        # through so we don't re-interpolate on-manifold points off-manifold.
         return [list(map(float, wp)) for wp in waypoints]
-    tensor = torch.tensor(waypoints, dtype=torch.float32)
-    if tensor.shape[0] == 1:
-        tensor = tensor.repeat(horizon, 1)
-    else:
-        import torch.nn.functional as F
-
-        tensor = (
-            F.interpolate(
-                tensor.transpose(0, 1).unsqueeze(0),
-                size=int(horizon),
-                mode="linear",
-                align_corners=True,
-            )
-            .squeeze(0)
-            .transpose(0, 1)
-            .contiguous()
-        )
-    return tensor.tolist()
+    unique: list[list[float]] = [list(map(float, waypoints[0]))]
+    for wp in waypoints[1:]:
+        wp = list(map(float, wp))
+        if any(abs(a - b) > 1.0e-9 for a, b in zip(wp, unique[-1])):
+            unique.append(wp)
+    if len(unique) == 1:
+        return [list(unique[0]) for _ in range(horizon)]
+    tensor = torch.tensor(unique, dtype=torch.float32)
+    seg = torch.linalg.norm(tensor[1:] - tensor[:-1], dim=-1)
+    cumulative = torch.cat([torch.zeros(1), torch.cumsum(seg, dim=0)])
+    total = float(cumulative[-1].item())
+    if total <= 1.0e-9:
+        return [list(map(float, unique[0])) for _ in range(horizon)]
+    targets = torch.linspace(0.0, total, int(horizon))
+    resampled: list[list[float]] = []
+    for target in targets.tolist():
+        # Locate the segment containing this arc-length target.
+        idx = int(torch.searchsorted(cumulative, torch.tensor(target)).item())
+        idx = max(1, min(idx, tensor.shape[0] - 1))
+        seg_start, seg_end = cumulative[idx - 1].item(), cumulative[idx].item()
+        span = seg_end - seg_start
+        alpha = 0.0 if span <= 1.0e-9 else (target - seg_start) / span
+        point = tensor[idx - 1] + float(alpha) * (tensor[idx] - tensor[idx - 1])
+        resampled.append([float(v) for v in point.tolist()])
+    return resampled
 
 
 def action_horizon(planner: Any) -> int:
@@ -444,4 +742,3 @@ def build_result_dict(
     if out_dir is not None:
         planner._write_artifacts(result, out_dir)
     return result.to_dict()
-

@@ -55,3 +55,9 @@ def test_chomp_registered_as_external_method() -> None:
     spec = get_method("baseline/chomp_constraint")
     assert spec.external
     assert spec.runner is not None
+
+
+def test_ompl_projection_registered_as_external_method() -> None:
+    spec = get_method("baseline/ompl_projection")
+    assert spec.external
+    assert spec.runner is not None

@@ -372,8 +372,8 @@
         {
           "id": "B5",
           "description": "投影式约束规划 baseline (硬底线之一)：按 B1 包 OMPL ConstrainedStateSpace/ProjectedStateSpace (重) 或复现切空间投影规划器。B5 或 B3c 至少一个必须交付——这是全论文唯一一类真正把水平当硬约束的对手，不是可全砍的 optional。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "B0",
             "B1",
@@ -384,17 +384,19 @@
             "若 B5 具体实现超期，回退到 B3c 经典约束优化承担『约束强制型对手』角色；但不允许 B5 与 B3c 同时缺席 (否则 E1 无硬约束对手、Table I 约束格空)。"
           ],
           "files": [
-            "新投影规划器模块",
-            "tools/dataset/run_closed_loop_benchmark.py"
+            "tools/dataset/baselines/ompl_projection.py",
+            "tools/dataset/baselines/ompl_bridge.py",
+            "tools/dataset/methods.py"
           ],
           "uncertainty": "最高——可行性取决于 B1；但『B5 或 B3c 至少一个』被提升为 B 阶段硬出口，不可两者皆砍。",
-          "review_change": "审查：B5 从『可全砍的最高风险项』提升为硬底线(B5 或 B3c 至少一个必交付)，防论文只剩稻草人+无约束地板。"
+          "review_change": "审查：B5 从『可全砍的最高风险项』提升为硬底线(B5 或 B3c 至少一个必交付)，防论文只剩稻草人+无约束地板。",
+          "result_note": "OMPL 投影式约束规划已交付 (tools/dataset/baselines/ompl_projection.py, METHOD_NAME=baseline/ompl_projection)。绑定限制: 安装的 OMPL 2.0.1 nanobind wheel 不暴露 ProjectedStateSpace 的 Python 写钩子 (copyFromReals 拒绝约束态, StateSampler/ValidStateSamplerAllocator 不可构造, 已对活 wheel 穷举验证), 故按 B1 §2/§3a 风险预案改为: 在可写 RealVectorStateSpace 上跑与 B3b 相同的无约束 RRT-Connect, 再把每个路点 Newton 投影到水平流形 (共享切空间残差 + autograd 雅可比, 带 trust-region 保连续)。硬约束仍作用在输出上, 只是机制从 in-search 移到后处理。经 A1 真实碰撞 + 共享硬验收器打分。冒烟(2026-07-18)确认: 对齐≈1.9° 与连续性(步长0.03)由构造达成, 但有两类如实上报的固有失败: (1) 目标漂移——CuRobo IK 目标常落在与 start-warm-start 链不同的 IK 分支/流形盆地, trust-region 投影无法跨分支到达; (2) 碰撞——投影对障碍无感知, 内部路点可穿透。这是 projection-after-unconstrained-search 的性质而非 bug; B3c 以联合下降解决之。"
         },
         {
           "id": "B6",
           "description": "统一进 A3/A4 harness：所有已交付 baseline 经同一 validators.evaluate_hard_constraints + A1 真实碰撞打分，喂 A4.2 转换器成 paper_result.v1；扩展 _summarize_strategy 消费外部 source_type；在 curobo conda 环境小批 smoke。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "B2",
             "B3a",
@@ -410,10 +412,12 @@
           ],
           "files": [
             "tools/dataset/run_closed_loop_benchmark.py",
-            "A4 转换器模块"
+            "tools/dataset/paper_result.py",
+            "tools/dataset/methods.py"
           ],
           "uncertainty": "中——依赖 A4 schema 冻结；最终跑需 GPU curobo 环境。",
-          "review_change": "审查：B6 依赖从『B2+B3a+B3b+B4+B5 全合取』改为保底集(B2/B3a/B4)硬依赖 + B3b optional + B5/B3c 至少一个，防单外部项失败阻断整个 D。"
+          "review_change": "审查：B6 依赖从『B2+B3a+B3b+B4+B5 全合取』改为保底集(B2/B3a/B4)硬依赖 + B3b optional + B5/B3c 至少一个，防单外部项失败阻断整个 D。",
+          "result_note": "所有已交付 baseline (curobo_native_unconstrained, learned_seed_goal_only, curobo_soft_cost, chomp_constraint, ompl_rrtc, ompl_projection) 均经 methods.py 的 external=True+runner 契约接入, 产 candidate_records 由同一 validators.evaluate_hard_constraints + A1 真实碰撞打分。_summarize_strategy 经 source_lineage.source_type 消费外部方法; tools/dataset/paper_result.py from_benchmark_report 把外部方法转成 paper_result.v1 行 (冒烟确认 baseline/chomp_constraint → schema=paper_result.v1, success_rate 出值)。出口硬校验满足: 约束强制型对手 B3c(工作floor) + B5(投影, best-effort) 均已接入并出 paper_result。"
         }
       ]
     },

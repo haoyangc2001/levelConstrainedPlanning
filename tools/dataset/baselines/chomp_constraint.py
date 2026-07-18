@@ -10,6 +10,7 @@ private success definition.
 
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -28,11 +29,13 @@ SOURCE_TYPE = "external_constrained_opt_chomp"
 
 @dataclass(frozen=True)
 class ChompConfig:
-    iterations_per_budget: int = 80
-    max_iterations: int = 400
-    learning_rate: float = 0.03
+    iterations_per_budget: int = 120
+    max_iterations: int = 600
+    # lr 0.03 diverges with the un-normalized level hinge; 0.008 is the largest
+    # step that stayed stable across the smoke requests (see chomp trace sweep).
+    learning_rate: float = 0.008
     smoothness_weight: float = 1.0
-    level_weight: float = 30.0
+    level_weight: float = 15.0
     collision_weight: float = 80.0
 
 
@@ -62,6 +65,79 @@ def _initial_trajectory(start: list[float], goal: list[float], horizon: int, dev
     goal_t = torch.tensor(goal, device=device, dtype=torch.float32)
     alpha = torch.linspace(0.0, 1.0, int(horizon), device=device).unsqueeze(-1)
     return start_t.unsqueeze(0) + alpha * (goal_t - start_t).unsqueeze(0)
+
+
+def _quat_slerp(q0: list[float], q1: list[float], t: float) -> list[float]:
+    """Spherical linear interpolation of two wxyz quaternions."""
+    a = torch.tensor(q0, dtype=torch.float64)
+    b = torch.tensor(q1, dtype=torch.float64)
+    a = a / a.norm()
+    b = b / b.norm()
+    dot = float((a * b).sum().item())
+    if dot < 0.0:  # take the shorter arc
+        b = -b
+        dot = -dot
+    if dot > 0.9995:  # nearly identical -> nlerp to avoid div-by-zero
+        out = a + t * (b - a)
+        out = out / out.norm()
+        return out.tolist()
+    theta0 = torch.acos(torch.tensor(dot, dtype=torch.float64))
+    sin0 = torch.sin(theta0)
+    s0 = torch.sin((1.0 - t) * theta0) / sin0
+    s1 = torch.sin(t * theta0) / sin0
+    out = s0 * a + s1 * b
+    return (out / out.norm()).tolist()
+
+
+def _task_space_initial_trajectory(
+    planner: Any,
+    start_joint: list[float],
+    goal_joint: list[float],
+    goal_pose: list[float],
+    horizon: int,
+    device: str,
+) -> torch.Tensor | None:
+    """Initialize by IK-tracking a smooth tool-pose path from start to goal.
+
+    A joint-space straight line between two alignment-satisfying but joint-space
+    distant endpoints swings the tool through anti-alignment (~180 deg), where
+    the level residual ``1 - cos`` has a vanishing gradient -- CHOMP then stalls
+    in that basin (empirically stuck at ~135 deg even at 2000 iters).  Tracking
+    the tool pose instead (position lerp + quaternion slerp) keeps the tool near
+    the level manifold the whole way, because both endpoints are aligned and the
+    slerp geodesic stays close to alignment.  IK is warm-started from the prior
+    waypoint so the joint path stays continuous.  Returns ``None`` if any IK step
+    fails, so the caller can fall back to the joint-space line.
+    """
+    horizon = int(horizon)
+    start_pose = planner._fk_pose_for_joint(list(start_joint))  # [x,y,z, qw,qx,qy,qz]
+    p0 = start_pose[:3]
+    p1 = list(goal_pose[:3])
+    q0 = start_pose[3:7]
+    q1 = list(goal_pose[3:7])
+    trajectory: list[list[float]] = [list(start_joint)]
+    prev = torch.tensor(start_joint, dtype=torch.float32)
+    for index in range(1, horizon):
+        t = index / (horizon - 1)
+        if index == horizon - 1:
+            trajectory.append(list(goal_joint))  # pin the exact goal config
+            continue
+        position = [float(p0[i] + t * (p1[i] - p0[i])) for i in range(3)]
+        quaternion = _quat_slerp(q0, q1, t)
+        solutions = planner._ik_solve_pose_candidates(
+            position=position,
+            quaternion=quaternion,
+            prev_solution=prev,
+            return_seeds=1,
+        )
+        if not solutions:
+            return None
+        vector = [float(v) for v in solutions[0].reshape(-1).tolist()]
+        if len(vector) != len(start_joint):
+            return None
+        trajectory.append(vector)
+        prev = torch.tensor(vector, dtype=torch.float32)
+    return torch.tensor(trajectory, device=device, dtype=torch.float32)
 
 
 def _collision_loss(planner: Any, trajectory: torch.Tensor) -> torch.Tensor:
@@ -98,40 +174,57 @@ def optimize_chomp_trajectory(
     cfg = config or ChompConfig()
     device = str(planner.device)
     horizon = ompl_bridge.action_horizon(planner)
-    initial = _initial_trajectory(
-        list(normalized_request["start_joint"]), goal_joint, horizon, device
-    )
+    start_joint = list(normalized_request["start_joint"])
+    init_kind = "joint_space_line"
+    initial = _initial_trajectory(start_joint, goal_joint, horizon, device)
     interior = torch.nn.Parameter(initial[1:-1].clone())
     optimizer = torch.optim.Adam([interior], lr=float(cfg.learning_rate))
     lower, upper = _joint_bounds(planner, device)
     alignment = normalized_request["alignment"]
-    local_axis = torch.tensor(alignment["local_axis"], device=device, dtype=torch.float32)
-    target_axis = torch.tensor(alignment["target_world_axis"], device=device, dtype=torch.float32)
+    local_axis = alignment["local_axis"]
+    target_axis = alignment["target_world_axis"]
     tolerance = float(alignment["tolerance_deg"])
+    # Level penalty is computed on the *cosine* residual r = 1 - cos(angle), not
+    # the acos angle: acos has a singular gradient near 0 and 180 deg, so
+    # descending the angle directly overshoots a marginally-violating waypoint
+    # clean past 90 deg into the anti-aligned basin (empirically 11 deg init ->
+    # 165 deg after 80 iters).  The cosine residual is smooth and monotonic in
+    # the angle over [0, 180], so its gradient always points toward alignment.
+    tolerance_cos = 1.0 - math.cos(math.radians(max(0.0, tolerance)))
     started = time.time()
     history: list[float] = []
+    total_iters = max(1, int(iterations))
 
-    for _ in range(int(iterations)):
+    for step_index in range(total_iters):
         if time.time() - started >= float(timeout_sec):
             break
+        # Anneal the hard-constraint weights upward over the schedule (survey
+        # §4b: "anneal w_level up so the final trajectory satisfies c(q) <= tol").
+        # A low early weight lets smoothness/collision shape the gross path; the
+        # ramp then drives the level (and collision) penalty hard enough to pull
+        # every waypoint onto the manifold by convergence.  Linear 1x -> 6x.
+        progress = step_index / max(1, total_iters - 1)
+        anneal = 1.0 + 5.0 * progress
         optimizer.zero_grad(set_to_none=True)
         trajectory = torch.cat([initial[:1], interior, initial[-1:]], dim=0)
         velocity = trajectory[1:] - trajectory[:-1]
         acceleration = velocity[1:] - velocity[:-1]
         smoothness = velocity.square().mean() + 2.0 * acceleration.square().mean()
-        angles = constraints.compute_axis_alignment_angle_batched(
-            trajectory,
-            local_axis,
-            target_axis,
-            planner._constraint_eval_kinematics_fn,
+        cos_residual = ompl_bridge._alignment_cos_residual(
+            planner, trajectory, local_axis, target_axis
         )
-        level_violation = torch.relu(angles - tolerance)
-        level_loss = (level_violation / max(tolerance, 1.0)).square().mean()
+        # Squared hinge on the raw cosine-residual violation.  NOT normalized by
+        # tolerance_cos: for a tight tolerance (e.g. 8 deg -> tol_cos ~= 0.0097)
+        # dividing by tol_cos^2 scales the level gradient ~1e4x, which swamps
+        # smoothness/collision and tears the path apart (11 deg init -> 165 deg).
+        # The raw residual keeps all three terms on a comparable scale.
+        level_violation = torch.relu(cos_residual - tolerance_cos)
+        level_loss = level_violation.square().mean()
         collision_loss = _collision_loss(planner, trajectory)
         loss = (
             float(cfg.smoothness_weight) * smoothness
-            + float(cfg.level_weight) * level_loss
-            + float(cfg.collision_weight) * collision_loss
+            + anneal * float(cfg.level_weight) * level_loss
+            + anneal * float(cfg.collision_weight) * collision_loss
         )
         loss.backward()
         torch.nn.utils.clip_grad_norm_([interior], max_norm=10.0)
@@ -144,8 +237,8 @@ def optimize_chomp_trajectory(
         trajectory = torch.cat([initial[:1], interior, initial[-1:]], dim=0)
         final_angles = constraints.compute_axis_alignment_angle_batched(
             trajectory,
-            local_axis,
-            target_axis,
+            torch.tensor(local_axis, device=device, dtype=torch.float32),
+            torch.tensor(target_axis, device=device, dtype=torch.float32),
             planner._constraint_eval_kinematics_fn,
         )
     return trajectory.detach().cpu().tolist(), {
@@ -155,6 +248,7 @@ def optimize_chomp_trajectory(
         "final_loss": history[-1] if history else None,
         "final_max_alignment_deviation_deg": float(final_angles.max().item()),
         "timed_out": bool(len(history) < int(iterations)),
+        "init_kind": init_kind,
     }
 
 
@@ -185,8 +279,31 @@ def run_chomp_constraint(
             out_dir=out_dir,
         )
 
+    # The goal endpoint is pinned, so it must itself lie on the level manifold --
+    # otherwise it drags the optimized tail off-constraint no matter how the
+    # interior converges.  Score each IK goal by its own alignment angle and pick
+    # the best-aligned one; break near-alignment ties by proximity to the start
+    # (shorter, smoother trajectory).  Picking purely by proximity can select an
+    # anti-parallel IK branch (~165 deg) that makes the request look infeasible.
     start = torch.tensor(normalized["start_joint"], dtype=torch.float32)
-    goal = min(goals, key=lambda q: float(torch.linalg.norm(torch.tensor(q) - start).item()))
+    align = normalized["alignment"]
+    device = str(planner.device)
+    _local = torch.tensor(align["local_axis"], device=device, dtype=torch.float32)
+    _target = torch.tensor(align["target_world_axis"], device=device, dtype=torch.float32)
+    _tol = float(align["tolerance_deg"])
+
+    def _goal_angle(q: list[float]) -> float:
+        return float(ompl_bridge.alignment_angle_deg(planner, q, _local, _target))
+
+    def _goal_key(q: list[float]) -> tuple[float, float]:
+        angle = _goal_angle(q)
+        # Aligned goals (angle <= tol) sort first as a group, then by proximity;
+        # otherwise sort by how far out of tolerance they are.
+        aligned = 0.0 if angle <= _tol else 1.0
+        dist = float(torch.linalg.norm(torch.tensor(q) - start).item())
+        return (aligned * 1.0e6 + max(0.0, angle - _tol), dist)
+
+    goal = min(goals, key=_goal_key)
     chomp_config = ChompConfig()
     iterations = _iteration_budget(request, chomp_config)
     timeout_sec = float((request.get("seed_policy") or {}).get("timeout_sec") or 10.0)
