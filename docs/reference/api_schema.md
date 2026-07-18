@@ -65,6 +65,7 @@ Status values:
 - `failed_precheck`
 - `failed_goal`
 - `failed_alignment_constraint`
+- `failed_hard_validation`
 - `failed_planner`
 - `failed_internal_error`
 

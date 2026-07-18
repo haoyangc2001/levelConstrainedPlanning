@@ -79,3 +79,51 @@ def test_select_level_first_candidate_goal_only_ignores_alignment():
     assert abs(goal_only["selected_max_alignment_deviation"] - 40.0) < 1e-6
     assert goal_only["candidate_max_alignment_deviation"] == [40.0, 2.0, 60.0]
 
+
+def test_select_level_first_candidate_filters_hard_invalid_candidates():
+    positions = torch.zeros((2, 3, 6), dtype=torch.float32)
+    level_eval = {
+        "max_alignment_deviation": torch.tensor([1.0, 2.0]),
+        "alignment_valid": torch.tensor([True, True]),
+    }
+    continuity = {
+        "start_joint_gap_l2": torch.tensor([0.0, 0.0]),
+        "joint_step_jump_cost": torch.tensor([0.0, 0.1]),
+        "twist_smoothness_cost": torch.tensor([0.0, 0.1]),
+        "joint_step_max_abs": torch.tensor([0.0, 0.1]),
+        "joint_step_max_l2": torch.tensor([0.0, 0.1]),
+        "joint_step_mean_l2": torch.tensor([0.0, 0.1]),
+    }
+    result = constraints.select_level_first_candidate(
+        positions,
+        level_eval,
+        continuity,
+        candidate_eligibility=torch.tensor([False, True]),
+    )
+    assert result["planning_status"] == "success"
+    assert result["selected_index"] == 1
+    assert result["hard_alignment_valid_count"] == 1
+
+
+def test_select_level_first_candidate_fails_when_all_hard_invalid():
+    positions = torch.zeros((2, 3, 6), dtype=torch.float32)
+    level_eval = {
+        "max_alignment_deviation": torch.tensor([1.0, 2.0]),
+        "alignment_valid": torch.tensor([True, True]),
+    }
+    continuity = {
+        "start_joint_gap_l2": torch.tensor([0.0, 0.0]),
+        "joint_step_jump_cost": torch.tensor([0.0, 0.1]),
+        "twist_smoothness_cost": torch.tensor([0.0, 0.1]),
+        "joint_step_max_abs": torch.tensor([0.0, 0.1]),
+        "joint_step_max_l2": torch.tensor([0.0, 0.1]),
+        "joint_step_mean_l2": torch.tensor([0.0, 0.1]),
+    }
+    result = constraints.select_level_first_candidate(
+        positions,
+        level_eval,
+        continuity,
+        candidate_eligibility=torch.tensor([False, False]),
+    )
+    assert result["planning_status"] == "failed_hard_validation"
+    assert result["hard_alignment_valid_count"] == 0

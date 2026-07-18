@@ -10,6 +10,7 @@ STATUS_SUCCESS = "success"
 STATUS_FAILED_PRECHECK = "failed_precheck"
 STATUS_FAILED_GOAL = "failed_goal"
 STATUS_FAILED_ALIGNMENT = "failed_alignment_constraint"
+STATUS_FAILED_VALIDATION = "failed_hard_validation"
 STATUS_FAILED_PLANNER = "failed_planner"
 STATUS_FAILED_INTERNAL = "failed_internal_error"
 

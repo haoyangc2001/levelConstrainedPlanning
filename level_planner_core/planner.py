@@ -24,6 +24,7 @@ from .result_schema import (
     STATUS_FAILED_INTERNAL,
     STATUS_FAILED_PLANNER,
     STATUS_FAILED_PRECHECK,
+    STATUS_FAILED_VALIDATION,
     STATUS_SUCCESS,
 )
 from .learned_seed import CheckpointDiffusionSeedProvider, CheckpointDiffusionSeedProviderConfig
@@ -984,10 +985,9 @@ class LevelConstrainedPlanner:
                 ),
                 "selected": idx == selected_index,
             }
-        status = STATUS_SUCCESS if selection["planning_status"] == "success" else STATUS_FAILED_ALIGNMENT
-        selected_candidate_id = None
-        if 0 <= selected_index < len(successful_summaries):
-            selected_candidate_id = str(successful_summaries[selected_index].get("candidate_id"))
+        provisional_status = (
+            STATUS_SUCCESS if selection["planning_status"] == "success" else STATUS_FAILED_ALIGNMENT
+        )
         candidate_records: list[dict[str, Any]] = []
         success_index = 0
         for item in candidate_summaries:
@@ -1001,22 +1001,85 @@ class LevelConstrainedPlanner:
                     request_id=request_id,
                     run_id=request_id,
                     trajectory=trajectory_tensor,
-                    final_status=status,
+                    final_status=provisional_status,
                     final_failure_reason=selection.get("failure_reason"),
                     alignment_tolerance_deg=float(alignment["tolerance_deg"]),
                     start_joint=request["start_joint"],
                 )
             )
+        successful_records = [
+            record
+            for record in candidate_records
+            if (record.get("optimizer_result") or {}).get("success")
+        ]
+        goal_only = bool(request.get("metadata", {}).get("report_goal_only_no_level_gate", False))
+        eligibility: list[bool] = []
+        for record in successful_records:
+            validator = record.get("validator_metrics") or {}
+            if not goal_only:
+                eligibility.append(bool(validator.get("valid")))
+                continue
+            checks = validator.get("checks") or {}
+            eligibility.append(
+                all(
+                    bool(check.get("valid", True))
+                    for name, check in checks.items()
+                    if name != "alignment"
+                )
+            )
+        if len(eligibility) != int(positions.shape[0]):
+            raise RuntimeError(
+                "successful candidate/validator count mismatch: "
+                f"records={len(eligibility)} trajectories={int(positions.shape[0])}"
+            )
+        selection = constraints.select_level_first_candidate(
+            positions,
+            level_eval,
+            continuity,
+            level_tolerance_deg=float(alignment["tolerance_deg"]),
+            strict_level=bool(alignment["strict_level"]),
+            ignore_alignment_for_selection=goal_only,
+            candidate_eligibility=torch.tensor(eligibility, device=positions.device, dtype=torch.bool),
+        )
+        selected_index = int(selection.get("selected_index", 0))
+        selected = positions[selected_index].detach().cpu()
+        trajectory = self._trajectory_tensor_to_list(selected)
+        planning_status = str(selection.get("planning_status") or "failed_hard_validation")
+        if planning_status == "success":
+            status = STATUS_SUCCESS
+        elif planning_status == "failed_alignment_constraint":
+            status = STATUS_FAILED_ALIGNMENT
+        else:
+            status = STATUS_FAILED_VALIDATION
+        selected_candidate_id = (
+            str(successful_summaries[selected_index].get("candidate_id"))
+            if 0 <= selected_index < len(successful_summaries)
+            else None
+        )
+        for idx, item in enumerate(successful_summaries):
+            (item.get("metrics") or {})["selected"] = idx == selected_index and status == STATUS_SUCCESS
         selected_validation = {}
         for record in candidate_records:
+            selected_record = record.get("candidate_id") == selected_candidate_id and status == STATUS_SUCCESS
+            lifecycle = record.get("lifecycle") or {}
+            lifecycle["selected"] = selected_record
+            labels = record.get("labels") or {}
+            labels["planner_status"] = status
+            labels["selected"] = selected_record
+            labels["positive_for_critic"] = bool(
+                selected_record and (record.get("validator_metrics") or {}).get("valid")
+            )
+            labels["negative_for_critic"] = not labels["positive_for_critic"]
             if record.get("candidate_id") == selected_candidate_id:
                 selected_validation = dict(record.get("validator_metrics") or {})
-                break
+        failure_reason = selection.get("failure_reason")
+        if status == STATUS_FAILED_VALIDATION and selected_validation:
+            failure_reason = selected_validation.get("failure_reason") or failure_reason
         selected_checks = selected_validation.get("checks") or {}
         return PlannerResult(
             request_id=request_id,
             status=status,
-            failure_reason=selection.get("failure_reason"),
+            failure_reason=failure_reason,
             selected_trajectory=trajectory if status == STATUS_SUCCESS else None,
             metrics={
                 **self._base_metrics(started_at),

@@ -1,9 +1,9 @@
 {
   "document_name": "Level Constrained Planning 论文实验工作计划 (Paper Experiment Plan)",
-  "version": "1.1",
+  "version": "1.2",
   "created_date": "2026-07-17",
-  "last_updated": "2026-07-17",
-  "revision_note": "v1.1：经 35-agent 对抗性审查（含二轮交叉验证）后大改。落地 27 条确认发现——1 致命（预算未真截断，A3.0）+ 一批 major。新增任务：A3.0/A3.8、B3c、C0c/C3b/C5、D5b；修正依赖图（D 编码 C3/C4、B6 保底集/optional 拆分）；补统计协议、train/test 隔离、独立几何校验、实机安全 checklist；三层诚实分层取代原两层；时间线改相对里程碑（不锁会议）。详见各 task 的 review_change 字段与 critical_path_and_risks。",
+  "last_updated": "2026-07-18",
+  "revision_note": "v1.2：进入逐任务执行阶段。回补 A1 hard-acceptance 语义：最终 success 现在必须来自完整 hard validator 有效候选；首选候选硬失败时继续在有效集合内做 level-first 选择；B4 goal-only 仅豁免 alignment，仍保留其他硬检查。新增 failed_hard_validation 状态、单元测试和真实 CuRobo 端到端复核。v1.1 的对抗性审查结论与任务结构保持不变。",
   "purpose": "把 docs/plan/paper/paper_experiment_plan.md 转成机器可读的任务清单。终点是产出一篇会议论文 (目标会议未锁定，先打磨去风险首切片再定投 ICRA/IROS/RA-L)。本文件记录整体背景、核心目标、当前状态审计、关键决策，以及从当前代码状态到论文提交的每一个可追踪任务。",
   "companion_documents": {
     "narrative_plan": "docs/plan/paper/paper_experiment_plan.md (本文件的叙述版，含 file:line 依据)",
@@ -129,7 +129,7 @@
             "tools/dataset/run_closed_loop_benchmark.py"
           ],
           "uncertainty": "已解除。",
-          "completion_note": "A1.1 spike 结论：CuRobo V2 RobotCollisionChecker.get_scene_self_collision_distance_from_joint_trajectory(q[batch,horizon,dof]) 返回逐球世界碰撞代价(米)：0=安全(超出激活带), 正值=侵入margin/穿模, 单调；per-link FK 由 KinematicsState.robot_spheres 内部处理。=> 走 A1.2 路径，A1.1b 自实现 SDF 兜底不需要。A1.2: planner._build_collision_checker() 复用 _planner.scene_collision_checker，激活距离=safety margin；planner._evaluate_collision(points) 返回 {collision_cost,min_distance_m,num_points,num_spheres}。A1.3: planner 计算好碰撞结果作 collision_result 传入 validators.evaluate_hard_constraints，validators 不 import curobo。A1.4: collision_safety_margin_m=0.005 加入 LevelPlannerConfig+_validator_thresholds+DEFAULT_THRESHOLDS；cost>0 -> collision_detected。A1.5: run_closed_loop_benchmark._validator_failure_counts 增加 collision_no_obstacles/collision_checked_ok，unchecked 归零。A1.6 验证(tools/dev/a1_collision_spike.py)：6障碍世界下 safe cost=0/dist=+0.005，into-floor cost=0.084/dist=-0.079，单调；validator 聚合：collision cost>0 触发 collision_detected 阻断 valid。全部 PASS。"
+          "completion_note": "A1.1 spike 结论：CuRobo V2 RobotCollisionChecker.get_scene_self_collision_distance_from_joint_trajectory(q[batch,horizon,dof]) 返回逐球世界碰撞代价(米)：0=安全(超出激活带), 正值=侵入margin/穿模, 单调；per-link FK 由 KinematicsState.robot_spheres 内部处理。=> 走 A1.2 路径，A1.1b 自实现 SDF 兜底不需要。A1.2: planner._build_collision_checker() 复用 _planner.scene_collision_checker，激活距离=safety margin；planner._evaluate_collision(points) 返回 {collision_cost,min_distance_m,num_points,num_spheres}。A1.3: planner 计算好碰撞结果作 collision_result 传入 validators.evaluate_hard_constraints，validators 不 import curobo。A1.4: collision_safety_margin_m=0.005 加入 LevelPlannerConfig+_validator_thresholds+DEFAULT_THRESHOLDS；cost>0 -> collision_detected。A1.5: run_closed_loop_benchmark._validator_failure_counts 增加 collision_no_obstacles/collision_checked_ok，unchecked 归零。A1.6 验证(tools/dev/a1_collision_spike.py)：6障碍世界下 safe cost=0/dist=+0.005，into-floor cost=0.084/dist=-0.079，单调；validator 聚合：collision cost>0 触发 collision_detected 阻断 valid。全部 PASS。2026-07-18 回补验收语义：planner 先为每条优化成功轨迹计算完整 validator，再仅在 hard-valid 集合内执行 level-first 选择；若首选硬失败则选择下一条有效候选，若全部硬失败返回 failed_hard_validation 且不返回轨迹。B4 goal-only 只忽略 alignment check，碰撞/目标/连续性/关节限位仍为硬门。新增 2 个 eligibility 单测，项目 20 tests 全绿；真实 CuRobo request_level_001 复核 status=success、selected=planner_01、hard_validator.valid=true，另外 3 条 alignment-invalid 候选均未选。"
         },
         {
           "id": "A2",

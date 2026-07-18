@@ -433,6 +433,7 @@ def select_level_first_candidate(
     level_tolerance_deg: float = 3.0,
     strict_level: bool = True,
     ignore_alignment_for_selection: bool = False,
+    candidate_eligibility: Optional[torch.Tensor] = None,
 ) -> Dict[str, Any]:
     """选择最优候选轨迹（alignment-first 策略）。
 
@@ -478,6 +479,15 @@ def select_level_first_candidate(
     joint_path_cost = segment_cost + 0.05 * start_to_end_cost
 
     alignment_valid_count = int(alignment_valid.sum().item())
+    if candidate_eligibility is None:
+        eligible = torch.ones(B, dtype=torch.bool, device=positions.device)
+    else:
+        eligible = candidate_eligibility.to(device=positions.device, dtype=torch.bool).reshape(-1)
+        if int(eligible.numel()) != B:
+            raise ValueError(
+                f'candidate_eligibility length mismatch: got {int(eligible.numel())}, expected {B}'
+            )
+    hard_eligible_count = int(eligible.sum().item())
 
     result = {
         'candidate_alignment_valid': [bool(v) for v in alignment_valid.tolist()],
@@ -489,6 +499,7 @@ def select_level_first_candidate(
         'candidate_twist_smoothness_cost': [round(float(v), 6) for v in twist_smoothness_cost.tolist()],
         'candidate_joint_path_costs': [round(float(v), 6) for v in joint_path_cost.tolist()],
         'alignment_valid_count': alignment_valid_count,
+        'hard_eligible_count': hard_eligible_count,
         'candidate_count': B,
         'alignment_tolerance_deg': float(level_tolerance_deg),
         'strict_level': bool(strict_level),
@@ -510,7 +521,23 @@ def select_level_first_candidate(
         # B4 单向学习种子 baseline：level-agnostic 选择——无视对齐，仅按连续性/
         # 路径代价挑最平滑候选，以『到达目标』为成功定义。真实对齐偏差已在
         # candidate_max_alignment_deviation 中记录，报告层据此量化真实违约率。
-        best_idx = min(range(B), key=_continuity_sort_key)
+        eligible_indices = torch.where(eligible)[0].tolist()
+        if not eligible_indices:
+            best_idx = min(range(B), key=_continuity_sort_key)
+            result.update({
+                'selected_index': int(best_idx),
+                'selected_max_alignment_deviation': round(float(max_dev[best_idx].item()), 4),
+                'selected_start_joint_gap_l2': round(float(start_joint_gap_l2[best_idx].item()), 6),
+                'selected_joint_step_jump_cost': round(float(joint_step_jump_cost[best_idx].item()), 6),
+                'selected_joint_step_max_abs': round(float(joint_step_max_abs[best_idx].item()), 6),
+                'selected_joint_step_max_l2': round(float(joint_step_max_l2[best_idx].item()), 6),
+                'selected_twist_smoothness_cost': round(float(twist_smoothness_cost[best_idx].item()), 6),
+                'planning_status': 'failed_hard_validation',
+                'failure_reason': 'No goal-reaching candidate passed non-alignment hard validation.',
+                'selection_mode': 'goal_only_alignment_ignored',
+            })
+            return result
+        best_idx = min(eligible_indices, key=_continuity_sort_key)
         result.update({
             'selected_index': int(best_idx),
             'selected_max_alignment_deviation': round(float(max_dev[best_idx].item()), 4),
@@ -525,8 +552,11 @@ def select_level_first_candidate(
         })
         return result
 
-    if alignment_valid_count > 0:
-        valid_indices = torch.where(alignment_valid)[0]
+    hard_alignment_valid = alignment_valid & eligible
+    hard_alignment_valid_count = int(hard_alignment_valid.sum().item())
+    result['hard_alignment_valid_count'] = hard_alignment_valid_count
+    if hard_alignment_valid_count > 0:
+        valid_indices = torch.where(hard_alignment_valid)[0]
         # [caohy] Task 40：对 joint_step_max_l2 做容差量化（0.5 rad 一档）作为粗分主键，
         # 让拼接处构型切换硬跳相同的 split 候选与原始种子落到同一档（max_l2 物理必然相同）。
         # 同档内用 joint_step_mean_l2（全程平均步长，反映段内平滑度，不受拼接处单步大跳和点数影响）
@@ -546,8 +576,20 @@ def select_level_first_candidate(
             'planning_status': 'success',
             'failure_reason': None,
         })
-    elif not strict_level:
+    elif alignment_valid_count > 0 and hard_eligible_count == 0:
         best_effort_idx = int(torch.argmin(max_dev).item())
+        result.update({
+            'selected_index': best_effort_idx,
+            'selected_max_alignment_deviation': round(float(max_dev[best_effort_idx].item()), 4),
+            'selected_joint_step_jump_cost': round(float(joint_step_jump_cost[best_effort_idx].item()), 6),
+            'selected_joint_step_max_abs': round(float(joint_step_max_abs[best_effort_idx].item()), 6),
+            'selected_joint_step_max_l2': round(float(joint_step_max_l2[best_effort_idx].item()), 6),
+            'planning_status': 'failed_hard_validation',
+            'failure_reason': 'Alignment-valid candidates exist, but none passed complete hard validation.',
+        })
+    elif not strict_level and hard_eligible_count > 0:
+        eligible_indices = torch.where(eligible)[0]
+        best_effort_idx = int(eligible_indices[torch.argmin(max_dev[eligible_indices])].item())
         result.update({
             'selected_index': best_effort_idx,
             'selected_max_alignment_deviation': round(float(max_dev[best_effort_idx].item()), 4),
