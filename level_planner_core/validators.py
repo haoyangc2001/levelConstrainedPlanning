@@ -74,6 +74,8 @@ def evaluate_hard_constraints(
     thresholds: dict[str, float] | None = None,
     collision_result: dict[str, Any] | None = None,
     dt_sec: float | None = None,
+    goal_orientation_active: bool = True,
+    level_active: bool = True,
 ) -> dict[str, Any]:
     """Evaluate all currently available hard validation checks.
 
@@ -82,10 +84,19 @@ def evaluate_hard_constraints(
     returned by ``planner._evaluate_collision(...)`` and carries the along-path
     minimum signed distance plus a raw collision cost. When ``None`` the check
     degrades to ``unchecked`` (kept valid) exactly as before A1.
+
+    C1b constraint-class axes:
+    - ``level_active`` selects the alignment (level) axis. When False (PP/PPO
+      classes) the deviation is still measured and reported but does not fail the
+      trajectory.
+    - ``goal_orientation_active`` selects the goal-orientation axis (LP/PP relax
+      it). See ``_evaluate_goal``.
     """
     active = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
-    alignment = _evaluate_alignment(metrics, alignment_tolerance_deg)
-    goal = _evaluate_goal(metrics, active)
+    alignment = _evaluate_alignment(
+        metrics, alignment_tolerance_deg, level_active=level_active
+    )
+    goal = _evaluate_goal(metrics, active, goal_orientation_active=goal_orientation_active)
     continuity = _evaluate_continuity(trajectory_points, start_joint, active)
     joint_limit = evaluate_joint_limits(trajectory_points, joint_limits)
     velocity_acceleration = evaluate_velocity_acceleration_proxy(trajectory_points, active, dt_sec)
@@ -359,38 +370,81 @@ def evaluate_velocity_acceleration_proxy(
     return result
 
 
-def _evaluate_alignment(metrics: dict[str, Any], tolerance_deg: float) -> dict[str, Any]:
+def _evaluate_alignment(
+    metrics: dict[str, Any],
+    tolerance_deg: float,
+    *,
+    level_active: bool = True,
+) -> dict[str, Any]:
     max_dev = _optional_float(metrics.get("max_alignment_deviation_deg"))
     mean_dev = _optional_float(metrics.get("mean_alignment_deviation_deg"))
-    valid = max_dev is not None and max_dev <= float(tolerance_deg)
+    within_tolerance = max_dev is not None and max_dev <= float(tolerance_deg)
+    # C1b: PP/PPO classes do not enforce the level axis. The deviation is still
+    # measured and reported (for auditing / cross-class comparison) but a
+    # violation does not fail the trajectory.
+    if not level_active:
+        return {
+            "valid": True,
+            "status": "not_enforced",
+            "failure_reason": None,
+            "level_active": False,
+            "within_tolerance": bool(within_tolerance),
+            "max_alignment_deviation_deg": max_dev,
+            "mean_alignment_deviation_deg": mean_dev,
+            "alignment_tolerance_deg": float(tolerance_deg),
+        }
     return {
-        "valid": bool(valid),
-        "status": "valid" if valid else "failed",
-        "failure_reason": None if valid else "failed_alignment_constraint",
+        "valid": bool(within_tolerance),
+        "status": "valid" if within_tolerance else "failed",
+        "failure_reason": None if within_tolerance else "failed_alignment_constraint",
+        "level_active": True,
         "max_alignment_deviation_deg": max_dev,
         "mean_alignment_deviation_deg": mean_dev,
         "alignment_tolerance_deg": float(tolerance_deg),
     }
 
 
-def _evaluate_goal(metrics: dict[str, Any], thresholds: dict[str, float]) -> dict[str, Any]:
+def _evaluate_goal(
+    metrics: dict[str, Any],
+    thresholds: dict[str, float],
+    *,
+    goal_orientation_active: bool = True,
+) -> dict[str, Any]:
+    """Evaluate the terminal goal.
+
+    C1b: ``goal_orientation_active`` selects the goal-orientation axis. When True
+    (``*O`` classes: LPO/PPO) both position and orientation must be within
+    tolerance. When False (position-only classes: LP/PP) only position is gated;
+    the orientation error is still measured and reported for the record but does
+    not fail the goal.
+    """
     position_error = _optional_float(metrics.get("position_error_m"))
     orientation_error = _optional_float(metrics.get("orientation_error_rad"))
     if orientation_error is None and metrics.get("orientation_error_deg") is not None:
         orientation_error = math.radians(float(metrics["orientation_error_deg"]))
-    valid = (
+    position_ok = (
         position_error is not None
-        and orientation_error is not None
         and position_error <= float(thresholds["goal_position_tolerance_m"])
-        and orientation_error <= float(thresholds["goal_orientation_tolerance_rad"])
     )
+    if goal_orientation_active:
+        orientation_ok = (
+            orientation_error is not None
+            and orientation_error <= float(thresholds["goal_orientation_tolerance_rad"])
+        )
+        have_any_metric = position_error is not None or orientation_error is not None
+    else:
+        # Position-only goal: orientation is informational, not gated.
+        orientation_ok = True
+        have_any_metric = position_error is not None
+    valid = bool(position_ok and orientation_ok)
     failure_reason = None
     if not valid:
-        failure_reason = "failed_goal" if position_error is not None or orientation_error is not None else "required_validator_metric_missing"
+        failure_reason = "failed_goal" if have_any_metric else "required_validator_metric_missing"
     return {
-        "valid": bool(valid),
+        "valid": valid,
         "status": "valid" if valid else "failed",
         "failure_reason": failure_reason,
+        "goal_orientation_active": bool(goal_orientation_active),
         "terminal_position_error_m": position_error,
         "terminal_orientation_error_rad": orientation_error,
         "position_tolerance_m": float(thresholds["goal_position_tolerance_m"]),

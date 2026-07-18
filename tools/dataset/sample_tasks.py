@@ -14,6 +14,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from level_planner_core.constraint_class import (  # noqa: E402
+    CONSTRAINT_CLASS_ORDER,
+    DEFAULT_CONSTRAINT_CLASS,
+    get_spec as _constraint_class_spec,
+    normalize_class_id as _normalize_constraint_class,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BASE_REQUEST = REPO_ROOT / "examples/requests/request_level_alignment_hard.json"
@@ -210,8 +218,10 @@ def _sample_request(
     mode: str,
     split: str = "train",
     independent: bool = False,
+    constraint_class: str = DEFAULT_CONSTRAINT_CLASS,
 ) -> dict[str, Any]:
     profile = DIFFICULTY_PROFILES[difficulty]
+    class_spec = _constraint_class_spec(constraint_class)
     request = json.loads(json.dumps(base))
     base_pose = _target_pose_list(base)
     position_jitter = float(profile["position_jitter_m"])
@@ -270,8 +280,19 @@ def _sample_request(
     alignment["tolerance_deg"] = float(profile["tolerance_deg"])
     alignment.setdefault("local_axis", [0.0, 1.0, 0.0])
     alignment.setdefault("target_world_axis", [0.0, 0.0, -1.0])
-    alignment["strict_level"] = True
+    # C1b: the level axis (L vs P) drives strict_level. A ``P`` (no-level) class
+    # keeps the alignment fields for reporting but marks the level gate inactive so
+    # the planner/validator do not enforce it.
+    alignment["strict_level"] = bool(class_spec.level_active)
     request["alignment"] = alignment
+    # C1b: publish the canonical class + its two boolean axes on the request so the
+    # planner reads one source of truth. The goal-orientation axis (PO vs P suffix)
+    # is a position-only goal relaxation applied as a validation/selection gate.
+    request["constraint_class"] = class_spec.class_id
+    request["constraint_axes"] = {
+        "level_active": bool(class_spec.level_active),
+        "goal_orientation_active": bool(class_spec.goal_orientation_active),
+    }
 
     k_generate = 4 if mode in {"mixed", "shadow", "diffusion", "candidate"} else 2
     seed_policy = dict(request.get("seed_policy") or {})
@@ -305,6 +326,9 @@ def _sample_request(
                 "base_request": str(base_path),
                 "split": split,
                 "sampling_mode": "independent" if independent else "base_jitter",
+                "constraint_class": class_spec.class_id,
+                "level_active": bool(class_spec.level_active),
+                "goal_orientation_active": bool(class_spec.goal_orientation_active),
             },
             "num_candidates": int(profile["num_candidates"]),
         }
@@ -320,6 +344,7 @@ def generate_task_requests(
     seed: int,
     difficulty: str = "mixed",
     obstacle_case: str = "mixed",
+    constraint_class: str = "mixed",
     modes: list[str] | None = None,
     val_frac: float = 0.1,
     test_frac: float = 0.2,
@@ -331,6 +356,10 @@ def generate_task_requests(
         raise ValueError(f"unsupported difficulty: {difficulty}")
     if obstacle_case not in {"none", "single", "multi", "mixed"}:
         raise ValueError(f"unsupported obstacle_case: {obstacle_case}")
+    if constraint_class != "mixed":
+        # Validate + canonicalise a fixed class up-front (uppercases the id so it
+        # matches CONSTRAINT_CLASS_ORDER in _cycle_choice); "mixed" cycles all four.
+        constraint_class = _normalize_constraint_class(constraint_class)
     if not (0.0 <= val_frac < 1.0 and 0.0 <= test_frac < 1.0 and val_frac + test_frac < 1.0):
         raise ValueError("val_frac/test_frac must be in [0,1) with val+test < 1")
     rng = random.Random(seed)
@@ -344,6 +373,7 @@ def generate_task_requests(
         base_path, base = bases[index % len(bases)]
         bucket = _cycle_choice(index, difficulty, ["easy", "medium", "hard"])
         obstacle = _cycle_choice(index, obstacle_case, ["none", "single", "multi"])
+        klass = _cycle_choice(index, constraint_class, list(CONSTRAINT_CLASS_ORDER))
         mode = modes[index % len(modes)]
         split = assign_split(index, val_frac=val_frac, test_frac=test_frac, rng=split_rng)
         tasks.append(
@@ -358,6 +388,7 @@ def generate_task_requests(
                 mode=mode,
                 split=split,
                 independent=independent,
+                constraint_class=klass,
             )
         )
     return tasks
@@ -398,6 +429,7 @@ def build_manifest(
         "seed_policy_modes": modes,
         "difficulty_bucket_counts": _counter_from_tasks(tasks, "difficulty_bucket"),
         "obstacle_case_counts": _counter_from_tasks(tasks, "obstacle_case"),
+        "constraint_class_counts": _counter_from_tasks(tasks, "constraint_class"),
         "mode_counts": _counter_from_tasks(tasks, "seed_policy_mode"),
         "split_counts": _counter_from_tasks(tasks, "split"),
         "sampling_mode_counts": _counter_from_tasks(tasks, "sampling_mode"),
@@ -424,6 +456,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=20260715)
     parser.add_argument("--difficulty", choices=["easy", "medium", "hard", "mixed"], default="mixed")
     parser.add_argument("--obstacle-case", choices=["none", "single", "multi", "mixed"], default="mixed")
+    parser.add_argument(
+        "--constraint-class",
+        choices=[*CONSTRAINT_CLASS_ORDER, *[c.lower() for c in CONSTRAINT_CLASS_ORDER], "mixed"],
+        default="mixed",
+        help="C1b: constraint class to sample. 'mixed' cycles LPO/LP/PPO/PP; "
+             "a fixed id (e.g. LPO) samples that class only.",
+    )
     parser.add_argument("--modes", default="mixed,rule,shadow")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--manifest-out", type=Path)
@@ -444,6 +483,7 @@ def main(argv: list[str] | None = None) -> int:
         seed=int(args.seed),
         difficulty=str(args.difficulty),
         obstacle_case=str(args.obstacle_case),
+        constraint_class=str(args.constraint_class),
         modes=modes,
         val_frac=float(args.val_frac),
         test_frac=float(args.test_frac),

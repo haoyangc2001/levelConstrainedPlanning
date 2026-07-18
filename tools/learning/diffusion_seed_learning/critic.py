@@ -14,9 +14,21 @@ from torch import nn
 from torch.utils.data import Dataset
 
 try:
-    from dataset import DEFAULT_VALIDATED_SAMPLES, build_condition, resample_trajectory
+    from dataset import (
+        DEFAULT_VALIDATED_SAMPLES,
+        _sample_has_constraint_class,
+        build_condition,
+        resample_trajectory,
+    )
 except ImportError:
-    from .dataset import DEFAULT_VALIDATED_SAMPLES, build_condition, resample_trajectory
+    from .dataset import (
+        DEFAULT_VALIDATED_SAMPLES,
+        _sample_has_constraint_class,
+        build_condition,
+        resample_trajectory,
+    )
+
+from level_planner_core.condition import CONDITION_DIM, CONDITION_DIM_WITH_CLASS
 
 
 CRITIC_OUTPUT_KEYS = [
@@ -97,7 +109,12 @@ def build_critic_feature(sample: dict[str, Any], horizon: int) -> torch.Tensor:
         + _source_type_one_hot(source_type),
         dtype=torch.float32,
     )
-    return torch.cat([build_condition(sample), trajectory.reshape(-1), summary], dim=0)
+    # C1b: mirror the dataset's per-sample class-axis auto-detection so the
+    # critic feature layout matches whatever the diffusion condition used.
+    cond_dim = CONDITION_DIM_WITH_CLASS if _sample_has_constraint_class(sample) else CONDITION_DIM
+    return torch.cat(
+        [build_condition(sample, condition_dim=cond_dim), trajectory.reshape(-1), summary], dim=0
+    )
 
 
 def build_critic_labels(sample: dict[str, Any]) -> dict[str, float]:

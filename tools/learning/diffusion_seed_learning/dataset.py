@@ -15,7 +15,11 @@ try:
     from artifact_paths import artifact_path
 except ImportError:
     from .artifact_paths import artifact_path
-from level_planner_core.condition import build_condition_tensor
+from level_planner_core.condition import (
+    CONDITION_DIM,
+    CONDITION_DIM_WITH_CLASS,
+    build_condition_tensor,
+)
 
 
 DEFAULT_VALIDATED_SAMPLES = artifact_path("dataset", "training_dataset")
@@ -55,8 +59,21 @@ def resample_trajectory(points: list[list[float]], horizon: int) -> torch.Tensor
     return torch.stack(columns, dim=-1)
 
 
-def build_condition(sample: dict[str, Any]) -> torch.Tensor:
-    return build_condition_tensor(sample)
+def build_condition(sample: dict[str, Any], *, condition_dim: int | None = None) -> torch.Tensor:
+    if condition_dim is None:
+        return build_condition_tensor(sample)
+    return build_condition_tensor(sample, condition_dim=condition_dim)
+
+
+def _sample_has_constraint_class(sample: dict[str, Any]) -> bool:
+    """True when a sample carries C1b constraint-class axes (constraint_axes or
+    constraint_class). Used to auto-select the 17-dim condition layout so C5
+    paper-scale data trains with class conditioning while legacy 15-dim data
+    stays unchanged."""
+    axes = sample.get("constraint_axes")
+    if isinstance(axes, dict) and axes:
+        return True
+    return bool(sample.get("constraint_class"))
 
 
 @dataclass
@@ -90,6 +107,7 @@ class TrajectorySeedDataset(Dataset):
         samples_path: Path = DEFAULT_VALIDATED_SAMPLES,
         horizon: int = 32,
         positive_only: bool = True,
+        include_constraint_class: bool | None = None,
     ) -> None:
         self.samples_path = Path(samples_path)
         self.horizon = int(horizon)
@@ -103,11 +121,24 @@ class TrajectorySeedDataset(Dataset):
         ]
         if not self.samples:
             raise ValueError(f"No usable trajectory samples found in {self.samples_path}")
+        # C1b: auto-detect the 17-dim class-conditioned layout when the samples
+        # carry constraint-class axes (C5 paper-scale data); legacy data without
+        # them stays 15-dim. An explicit flag overrides the auto-detection.
+        if include_constraint_class is None:
+            include_constraint_class = any(
+                _sample_has_constraint_class(sample) for sample in self.samples
+            )
+        self.include_constraint_class = bool(include_constraint_class)
+        self._condition_dim = (
+            CONDITION_DIM_WITH_CLASS if self.include_constraint_class else CONDITION_DIM
+        )
         trajectories = [
             resample_trajectory(sample["candidate"]["trajectory"]["points"], self.horizon)
             for sample in self.samples
         ]
-        conditions = [build_condition(sample) for sample in self.samples]
+        conditions = [
+            build_condition(sample, condition_dim=self._condition_dim) for sample in self.samples
+        ]
         self.trajectories = torch.stack(trajectories, dim=0)
         self.conditions = torch.stack(conditions, dim=0)
         self.normalization = Normalization(

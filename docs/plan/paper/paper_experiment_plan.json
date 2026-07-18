@@ -505,8 +505,8 @@
         {
           "id": "C1b",
           "description": "采样器：LP/LPO/PP/PPO 约束类支持 (多文件特性，非小改)：贯穿采样器 + planner 目标处理 + validators + condition 向量 + checkpoint schema。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [],
           "details": [
             "(1) 采样器加 constraint_class 字段发 4 类 (切 strict_level、切 goal 朝向是否约束)。",
@@ -522,7 +522,8 @@
           ],
           "uncertainty": "最高之一——多文件特性 + checkpoint schema 变更；GoalToolPose 是否支持 position-only 须验证。",
           "descope_branch": "若 C1b 被砍 (keep-level-only 为终稿)：Table I 删 constraint-class 列、差异化改由 projection/throughput/closed-loop/learning-target 承载 (对 McVAMP 仍成立)；Intro/Abstract/VI-Limitations 显式收窄为 single orientation-path(keep-level) constraint；D2 请求集塌为 keep-level×(密度 or 单世界)×100；E4w Table I 约束列标 conditional；E8w 贡献(3)择措辞扩展为同时按 C1b 落地与否收窄约束 scope。**登记：descope C1b 即触发 reframe，非无损**——约束类是把故事撑出单一 keep-level、区别于支持 LP/LPO/PP/PPO 的 McVAMP 的唯一杠杆。",
-          "review_change": "审查：C1b 补显式 descope 分支 + reframe 后果 (原兜底只讨论砍 B5/C4/E4，从未承认砍 C1b 会塌 novelty)。"
+          "review_change": "审查：C1b 补显式 descope 分支 + reframe 后果 (原兜底只讨论砍 B5/C4/E4，从未承认砍 C1b 会塌 novelty)。",
+          "implementation_note": "Done 2026-07-18. (1) sample_tasks.generate_task_requests emits constraint_class + constraint_axes, cycling LP/LPO/PP/PPO in 'mixed' (strict_level follows level_active). (2) planner._normalize_request decodes class via level_planner_core.constraint_class taxonomy -> sets level_active/goal_orientation_active + strict_level gate; _level_gate_disabled generalizes B4 goal_only to fire on level_active=False. (3) validators _evaluate_alignment gated by level_active (PP/PPO -> status=not_enforced, measured-not-failed), _evaluate_goal gated by goal_orientation_active; both threaded through evaluate_hard_constraints and all 3 planner record-builder call sites + _append_provider_candidate_records. (4) condition.py gated 17-dim (15 legacy + 2 class-axis) encoding keyed on requested condition_dim so old 15-dim checkpoints still run; +2 dims active only for C5 fresh train. Verified: 4-class cycling, 2x2 level x orientation gate matrix, condition round-trip. Learning side: dataset.TrajectorySeedDataset auto-detects the 17-dim layout when samples carry constraint_axes/constraint_class (else 15-dim); critic.build_feature_vector mirrors the same per-sample detection so diffusion + critic condition layouts stay in lockstep. condition_dim flows checkpoint <-> runtime via model_config['condition_dim']."
         },
         {
           "id": "C2",

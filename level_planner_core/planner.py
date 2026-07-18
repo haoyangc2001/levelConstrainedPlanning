@@ -14,6 +14,7 @@ from typing import Any
 import torch
 import yaml
 
+from . import constraint_class as constraint_class_taxonomy
 from . import constraints, validators
 from .result_schema import (
     CandidateRecord,
@@ -641,19 +642,41 @@ class LevelConstrainedPlanner:
 
         alignment = dict(request.get("alignment") or {})
         seed_policy = dict(request.get("seed_policy") or {})
+
+        # C1b: decode the constraint class into its two boolean axes. The class id
+        # (LPO/LP/PPO/PP) is the single source of truth; explicit ``constraint_axes``
+        # on the request override individual axes when present (so a hand-written
+        # request can still relax one axis without naming a class). ``strict_level``
+        # from the alignment block stays authoritative for the level gate when a
+        # request predates C1b (default class LPO => level on + full pose).
+        class_id = constraint_class_taxonomy.normalize_class_id(request.get("constraint_class"))
+        class_spec = constraint_class_taxonomy.get_spec(class_id)
+        req_axes = dict(request.get("constraint_axes") or {})
+        level_active = bool(req_axes.get("level_active", class_spec.level_active))
+        goal_orientation_active = bool(
+            req_axes.get("goal_orientation_active", class_spec.goal_orientation_active)
+        )
+        # The level gate is active iff the class says so AND the request did not
+        # already disable strict_level. A no-level class forces strict_level False.
+        strict_level = bool(alignment.get("strict_level", self.config.strict_level)) and level_active
         return {
             "schema_version": str(request.get("schema_version", "1.0")),
             "request_id": str(request.get("request_id") or "request"),
             "robot_profile": robot_profile,
             "start_joint": start_joint,
             "target_pose": target_pose,
+            "constraint_class": class_id,
+            "constraint_axes": {
+                "level_active": level_active,
+                "goal_orientation_active": goal_orientation_active,
+            },
             "alignment": {
                 "local_axis": [float(v) for v in alignment.get("local_axis", self.config.local_axis)],
                 "target_world_axis": [
                     float(v) for v in alignment.get("target_world_axis", self.config.target_world_axis)
                 ],
                 "tolerance_deg": float(alignment.get("tolerance_deg", self.config.level_tolerance_deg)),
-                "strict_level": bool(alignment.get("strict_level", self.config.strict_level)),
+                "strict_level": strict_level,
             },
             "seed_policy": {
                 "mode": str(seed_policy.get("mode", "rule")).strip().lower(),
@@ -1010,9 +1033,7 @@ class LevelConstrainedPlanner:
             continuity,
             level_tolerance_deg=float(alignment["tolerance_deg"]),
             strict_level=bool(alignment["strict_level"]),
-            ignore_alignment_for_selection=bool(
-                request.get("metadata", {}).get("report_goal_only_no_level_gate", False)
-            ),
+            ignore_alignment_for_selection=self._level_gate_disabled(request),
         )
         selected_index = int(selection.get("selected_index", 0))
         selected = positions[selected_index].detach().cpu()
@@ -1043,6 +1064,9 @@ class LevelConstrainedPlanner:
         )
         candidate_records: list[dict[str, Any]] = []
         success_index = 0
+        req_axes = request.get("constraint_axes") or {}
+        goal_orientation_active = bool(req_axes.get("goal_orientation_active", True))
+        level_active = bool(req_axes.get("level_active", True))
         for item in candidate_summaries:
             trajectory_tensor = None
             if item.get("status") == "success" and success_index < int(positions.shape[0]):
@@ -1058,6 +1082,8 @@ class LevelConstrainedPlanner:
                     final_failure_reason=selection.get("failure_reason"),
                     alignment_tolerance_deg=float(alignment["tolerance_deg"]),
                     start_joint=request["start_joint"],
+                    goal_orientation_active=goal_orientation_active,
+                    level_active=level_active,
                 )
             )
         successful_records = [
@@ -1065,7 +1091,7 @@ class LevelConstrainedPlanner:
             for record in candidate_records
             if (record.get("optimizer_result") or {}).get("success")
         ]
-        goal_only = bool(request.get("metadata", {}).get("report_goal_only_no_level_gate", False))
+        goal_only = self._level_gate_disabled(request)
         eligibility: list[bool] = []
         for record in successful_records:
             validator = record.get("validator_metrics") or {}
@@ -1175,6 +1201,21 @@ class LevelConstrainedPlanner:
         tool_pose = kin_state.tool_poses.get_link_pose(self._tool_frames[0])
         return SimpleNamespace(ee_quaternion=tool_pose.quaternion)
 
+    @staticmethod
+    def _level_gate_disabled(request: dict[str, Any]) -> bool:
+        """True when the level (axis-alignment) constraint must not gate selection.
+
+        Unifies two sources: the legacy B4 metadata flag
+        ``report_goal_only_no_level_gate`` and the C1b constraint-class axis
+        ``constraint_axes.level_active == False`` (PP / PPO classes). Either one
+        disables the alignment gate; a level-active class never re-enables a
+        gate the legacy flag turned off.
+        """
+        if bool((request.get("metadata") or {}).get("report_goal_only_no_level_gate", False)):
+            return True
+        axes = request.get("constraint_axes") or {}
+        return not bool(axes.get("level_active", True))
+
     def _summarize_terminal_goal(self, trajectory: torch.Tensor, target_pose: list[float]) -> dict[str, Any]:
         from curobo.types import JointState as CuJointState
 
@@ -1222,6 +1263,9 @@ class LevelConstrainedPlanner:
             )
         )
         start_joint = list((normalized_request or {}).get("start_joint") or [])
+        final_axes = (normalized_request or {}).get("constraint_axes") or {}
+        goal_orientation_active = bool(final_axes.get("goal_orientation_active", True))
+        level_active = bool(final_axes.get("level_active", True))
         if not result.candidate_records:
             result.candidate_records = [
                 self._build_candidate_record_from_summary(
@@ -1233,6 +1277,8 @@ class LevelConstrainedPlanner:
                     final_failure_reason=result.failure_reason,
                     alignment_tolerance_deg=alignment_tolerance,
                     start_joint=start_joint,
+                    goal_orientation_active=goal_orientation_active,
+                    level_active=level_active,
                 )
                 for item in result.candidates
             ]
@@ -1250,6 +1296,8 @@ class LevelConstrainedPlanner:
                         final_failure_reason=result.failure_reason,
                         alignment_tolerance_deg=alignment_tolerance,
                         start_joint=start_joint,
+                        goal_orientation_active=goal_orientation_active,
+                        level_active=level_active,
                     )
                 )
                 existing_candidate_record_ids.add(candidate_id)
@@ -1258,6 +1306,8 @@ class LevelConstrainedPlanner:
             run_id=run_id,
             start_joint=start_joint,
             alignment_tolerance_deg=alignment_tolerance,
+            goal_orientation_active=goal_orientation_active,
+            level_active=level_active,
         )
 
         selected_candidate_id = result.metrics.get("selected_candidate_id")
@@ -1340,6 +1390,8 @@ class LevelConstrainedPlanner:
         final_failure_reason: str | None,
         alignment_tolerance_deg: float,
         start_joint: list[float],
+        goal_orientation_active: bool = True,
+        level_active: bool = True,
     ) -> dict[str, Any]:
         candidate_id = str(summary.get("candidate_id") or f"candidate_{len(summary)}")
         source_type = self._normalize_source_type(summary.get("source_type") or summary.get("source_label"))
@@ -1371,6 +1423,8 @@ class LevelConstrainedPlanner:
             thresholds=self._validator_thresholds(),
             collision_result=self._evaluate_collision(trajectory_points),
             dt_sec=(summary.get("optimizer_result") or {}).get("interpolation_dt_sec"),
+            goal_orientation_active=bool(goal_orientation_active),
+            level_active=bool(level_active),
         )
         validator_valid = bool(validator_metrics.get("valid"))
         if optimizer_success and not validator_valid:
@@ -1447,6 +1501,8 @@ class LevelConstrainedPlanner:
         run_id: str,
         start_joint: list[float],
         alignment_tolerance_deg: float,
+        goal_orientation_active: bool = True,
+        level_active: bool = True,
     ) -> None:
         existing_ids = {str(item.get("candidate_id")) for item in result.candidate_records}
         for report in result.seed_provider_reports:
@@ -1471,6 +1527,8 @@ class LevelConstrainedPlanner:
                     world_summary=self._world_summary,
                     thresholds=self._validator_thresholds(),
                     collision_result=self._evaluate_collision(points),
+                    goal_orientation_active=bool(goal_orientation_active),
+                    level_active=bool(level_active),
                 )
                 failure_reason = (
                     candidate.get("precheck", {}).get("failure_reason")
