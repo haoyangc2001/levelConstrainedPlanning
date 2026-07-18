@@ -750,7 +750,10 @@
           ],
           "files": [],
           "uncertainty": "无——是校验门 + go/no-go 算力闸。",
-          "review_change": "审查：D1 新增 go/no-go 门 (C4 匹配预算对比作硬判据)，负面则不投 6000-plan 与 C2b 重算力；就绪清单补 A3.0/C0c/B5-or-B3c/C1b-descope 分支。"
+          "review_change": "审查：D1 新增 go/no-go 门 (C4 匹配预算对比作硬判据)，负面则不投 6000-plan 与 C2b 重算力；就绪清单补 A3.0/C0c/B5-or-B3c/C1b-descope 分支。",
+          "implementation_note": "D1 readiness gate checker authored: tools/dataset/d1_readiness_gate.py. Verifies A1 (collision_safety checked/safe/min_distance_m/num_spheres), A2 (dt_sec/motion_time_sec/max_jerk_rad_s3), A3/A4 (Wilson CI, p75/p98, budget/seed/method axes, per_problem_success in paper_result.py), B (baselines + adversary registered), C (artifact pointer -> C3 diffusion+critic, C2 dataset sample_count=54952 diff_pos=3196>=3000). Readiness axes all PASS. Go/no-go compute gate consumes runs/c4_test_eval/c4_significance.json when present; currently PENDING (C4 benchmark still running). Gate output: runs/c4_test_eval/d1_gate.json.",
+          "checker_authored": true,
+          "gate_status": "readiness_ok_verdict_pending"
         },
         {
           "id": "D2",
