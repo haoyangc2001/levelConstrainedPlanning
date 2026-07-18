@@ -106,7 +106,15 @@ class GaussianDiffusion1D:
         total = base
         if aux is not None and aux.active:
             x0_hat = self._predict_x0(xt, timesteps, predicted)
-            aux_loss, aux_parts = self._aux_losses(x0_hat, condition, aux)
+            # SNR (alpha_bar) weight per sample: x0_hat = (xt - sqrt(1-ab)*eps)/sqrt(ab)
+            # so d(x0_hat)/d(eps) ~ 1/sqrt(ab) blows up as ab->0 (high-noise t). Left
+            # unweighted, the aux gradient dominates clip_grad_norm and destroys the
+            # base denoising signal (observed: base_mse stuck ~3e5, never learns).
+            # Weighting the aux term by alpha_bar_t both bounds the effective gradient
+            # (sqrt(ab)*1/sqrt(ab)=O(1)) and only penalises alignment where x0_hat is
+            # actually signal (low noise), not where it is essentially noise.
+            snr_weight = self.alpha_bars[timesteps]  # [B], in (0,1]
+            aux_loss, aux_parts = self._aux_losses(x0_hat, condition, aux, snr_weight)
             total = total + aux_loss
             components.update(aux_parts)
         components["total"] = float(total.detach().item())
@@ -119,11 +127,16 @@ class GaussianDiffusion1D:
         x0_hat: torch.Tensor,
         condition: torch.Tensor,
         aux: "AuxLossConfig",
+        snr_weight: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, dict[str, float]]:
         """Compute the switchable L_level / L_collision terms on reconstructed x0.
 
         ``x0_hat`` is in *normalised* trajectory space; we denormalise to joint
-        radians before FK/collision. Returns (weighted_sum, per-term floats)."""
+        radians before FK/collision. ``snr_weight`` is the per-sample alpha_bar_t
+        (in (0,1]); when provided the aux terms are weighted by it so high-noise
+        timesteps (where x0_hat is essentially noise and the 1/sqrt(alpha_bar)
+        reconstruction gradient explodes) contribute little. Returns
+        (weighted_sum, per-term floats)."""
         device = x0_hat.device
         parts: dict[str, float] = {}
         aux_total = torch.zeros((), device=device)
@@ -133,6 +146,8 @@ class GaussianDiffusion1D:
             traj = aux.denormalize(x0_hat)
         batch, horizon, dof = traj.shape
         flat = traj.reshape(batch * horizon, dof)
+        if snr_weight is None:
+            snr_weight = torch.ones(batch, device=device)
 
         if aux.enable_l_level and aux.level_weight > 0.0 and aux.alignment_angle_fn is not None:
             angle_deg = aux.alignment_angle_fn(flat).reshape(batch, horizon)
@@ -142,8 +157,11 @@ class GaussianDiffusion1D:
                 mask = (condition[:, aux.level_active_index] > 0.5).to(per_sample.dtype)
             else:
                 mask = torch.ones_like(per_sample)
-            denom = mask.sum().clamp_min(1.0)
-            l_level = (per_sample * mask).sum() / denom
+            # SNR-weight the per-sample penalty (see training_loss): bounds the
+            # aux gradient and focuses it on low-noise reconstructions.
+            weight = mask * snr_weight
+            denom = weight.sum().clamp_min(1.0)
+            l_level = (per_sample * weight).sum() / denom
             aux_total = aux_total + float(aux.level_weight) * l_level
             parts["l_level"] = float(l_level.detach().item())
 
@@ -153,7 +171,9 @@ class GaussianDiffusion1D:
             and aux.collision_cost_fn is not None
         ):
             cost = aux.collision_cost_fn(flat).reshape(batch, horizon)
-            l_collision = torch.relu(cost).mean()
+            per_sample_c = torch.relu(cost).mean(dim=1)  # [B]
+            cdenom = snr_weight.sum().clamp_min(1.0)
+            l_collision = (per_sample_c * snr_weight).sum() / cdenom
             aux_total = aux_total + float(aux.collision_weight) * l_collision
             parts["l_collision"] = float(l_collision.detach().item())
 
