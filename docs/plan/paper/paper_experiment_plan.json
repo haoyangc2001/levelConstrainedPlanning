@@ -586,7 +586,7 @@
         {
           "id": "C2b",
           "description": "全 LP/LPO/PP/PPO x 密度 scale-up：仅在 C1b (约束类) + C0b (per-request 世界) 都就绪后可做，否则 4 类塌成同一 keep-level、密度恒定。",
-          "status": "pending",
+          "status": "descoped",
           "completed": false,
           "depends_on": [
             "C1b",
@@ -598,7 +598,10 @@
             "tools/dataset/sample_tasks.py",
             "tools/dataset/run_lifecycle_batch.py"
           ],
-          "uncertainty": "依赖 C1b/C0b 两个高不确定前置。"
+          "uncertainty": "依赖 C1b/C0b 两个高不确定前置。",
+          "descope_reason": "Off critical path (no task depends on C2b; C3 depends only on C2, done). Verified this cuRobo V2 build has NO partial-pose mechanism: GoalToolPose exposes only {tool_frames,position,quaternion} (no per-axis weight), and plan_pose/solve_pose/MotionPlannerCfg have no per-request orientation-weight knob (only a global orientation_tolerance=0.05). Therefore goal_orientation_active is honored at the VALIDATION gate but NOT at solve time — the solver always drives to full 6-DoF pose. Consequence: the L/P (level) axis is genuinely switched (strict_level threading + level validation gate both verified working), but the O (orientation) sub-axis collapses (LP==LPO, PP==PPO at the solved-motion level). A true position-only solve needs per-class solver reconfiguration (rebuild trajopt cost yaml with rotation weight zeroed) — a genuine feature, not a sampler tweak; C1b's own uncertainty flagged this.",
+          "what_is_real": "L/P level axis (paper's actual contribution) fully supported by C2's LP+LPO data. Obstacle-density axis real via C0b per-request world (C2 used mixed obstacle_case balanced none/single/multi). So keep-level x density is covered; only the orientation class sub-axis and the PP/PPO full-4-class matrix are deferred.",
+          "anti_over_claim": "Paper MUST NOT claim a realized 4-class (LPO/LP/PPO/PP) x density matrix at the SOLVE level. May claim: (1) level on/off axis, (2) obstacle-density axis. Orientation-free classes exist only as validation-gate labels, not distinct solved behaviors."
         },
         {
           "id": "C3",
