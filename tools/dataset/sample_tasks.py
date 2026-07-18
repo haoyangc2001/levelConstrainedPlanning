@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import random
 import subprocess
 import sys
@@ -27,6 +28,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BASE_REQUEST = REPO_ROOT / "examples/requests/request_level_alignment_hard.json"
 DEFAULT_OUT = Path("runs/offline_sampling/requests.jsonl")
 SCHEMA_VERSION = "planning_task_request_set.v1"
+
+
+# Level-neighbor goal ball radius, as a multiple of the difficulty profile's
+# joint_jitter_rad. The goal joint is drawn within [min, max] joint-L2 of the
+# level start so both endpoints share one manifold chart (connectable) while the
+# motion stays non-trivial. Overridable via env for calibration sweeps (C2).
+# Default max factor 3.0 is the C2-calibrated yield knee: it produced 9.0%
+# diffusion-positive yield on medium LP (above the 8.5% base-jitter reference)
+# with genuinely diverse, connectable problems (~0.13 rad motions) rather than
+# base-jitter's trivial ~0.08 rad micro-moves.
+_LEVEL_NEIGHBOR_MAX_FACTOR: float = float(os.environ.get("LEVEL_NEIGHBOR_MAX_FACTOR", "3.0"))
+_LEVEL_NEIGHBOR_MIN_FACTOR: float = float(os.environ.get("LEVEL_NEIGHBOR_MIN_FACTOR", "1.0"))
 
 
 DIFFICULTY_PROFILES: dict[str, dict[str, float]] = {
@@ -159,6 +172,76 @@ def _random_delta_quat(rng: random.Random, max_angle_deg: float) -> list[float]:
     return _normalize_quaternion([math.cos(half), *(math.sin(half) * v for v in axis)])
 
 
+def _quat_rotate_vec(quat: list[float], vec: list[float]) -> list[float]:
+    """Rotate a 3-vector by a wxyz quaternion (v' = q v q*)."""
+    w, x, y, z = quat
+    vx, vy, vz = vec
+    # t = 2 * cross(q_xyz, v)
+    tx = 2.0 * (y * vz - z * vy)
+    ty = 2.0 * (z * vx - x * vz)
+    tz = 2.0 * (x * vy - y * vx)
+    return [
+        vx + w * tx + (y * tz - z * ty),
+        vy + w * ty + (z * tx - x * tz),
+        vz + w * tz + (x * ty - y * tx),
+    ]
+
+
+def _level_align_quat(
+    base_quat: list[float],
+    local_axis: list[float],
+    target_world_axis: list[float],
+) -> list[float]:
+    """Return a quaternion whose ``local_axis`` maps exactly onto ``target_world_axis``.
+
+    Used for reachable-goal sampling of *level-active* classes: the FK image of
+    a random joint config is reachable but its orientation is arbitrary, so its
+    tool axis is almost never level.  We pre-multiply the FK orientation by the
+    minimal rotation that carries the current world-frame tool axis onto the
+    target axis, so the goal is level by construction while staying close to the
+    reachable FK orientation (small rotation -> still near the reachable set).
+    """
+    q = _normalize_quaternion(base_quat)
+    la = list(local_axis)
+    n = math.sqrt(sum(v * v for v in la)) or 1.0
+    la = [v / n for v in la]
+    ta = list(target_world_axis)
+    n = math.sqrt(sum(v * v for v in ta)) or 1.0
+    ta = [v / n for v in ta]
+    # current world-frame direction of the tool axis under the FK orientation
+    cur = _quat_rotate_vec(q, la)
+    n = math.sqrt(sum(v * v for v in cur)) or 1.0
+    cur = [v / n for v in cur]
+    dot = max(-1.0, min(1.0, sum(c * t for c, t in zip(cur, ta))))
+    if dot > 1.0 - 1e-8:
+        return q  # already aligned
+    if dot < -1.0 + 1e-8:
+        # antiparallel: rotate 180deg about any axis perpendicular to cur
+        perp = [1.0, 0.0, 0.0]
+        if abs(cur[0]) > 0.9:
+            perp = [0.0, 1.0, 0.0]
+        axis = [
+            cur[1] * perp[2] - cur[2] * perp[1],
+            cur[2] * perp[0] - cur[0] * perp[2],
+            cur[0] * perp[1] - cur[1] * perp[0],
+        ]
+        n = math.sqrt(sum(v * v for v in axis)) or 1.0
+        axis = [v / n for v in axis]
+        delta = [0.0, *axis]  # cos(90deg)=0, sin(90deg)=1
+    else:
+        axis = [
+            cur[1] * ta[2] - cur[2] * ta[1],
+            cur[2] * ta[0] - cur[0] * ta[2],
+            cur[0] * ta[1] - cur[1] * ta[0],
+        ]
+        n = math.sqrt(sum(v * v for v in axis)) or 1.0
+        axis = [v / n for v in axis]
+        angle = math.acos(dot)
+        half = 0.5 * angle
+        delta = [math.cos(half), *(math.sin(half) * v for v in axis)]
+    return _quat_multiply(delta, q)
+
+
 def _cycle_choice(index: int, requested: str, choices: list[str]) -> str:
     if requested != "mixed":
         return requested
@@ -219,13 +302,81 @@ def _sample_request(
     split: str = "train",
     independent: bool = False,
     constraint_class: str = DEFAULT_CONSTRAINT_CLASS,
+    goal_sampler: Any | None = None,
 ) -> dict[str, Any]:
     profile = DIFFICULTY_PROFILES[difficulty]
     class_spec = _constraint_class_spec(constraint_class)
     request = json.loads(json.dumps(base))
     base_pose = _target_pose_list(base)
     position_jitter = float(profile["position_jitter_m"])
-    if independent:
+    goal_witness_joint: list[float] | None = None
+    if independent and goal_sampler is not None:
+        # C1a (reachable): draw the goal as the FK image of a random feasible
+        # joint config -> reachable by construction (the config is itself a valid
+        # IK solution), eliminating the ~98% infeasible-goal waste of the blind
+        # workspace-box draw.
+        local_axis = list((base.get("alignment") or {}).get("local_axis", [0.0, 1.0, 0.0]))
+        target_axis = list(
+            (base.get("alignment") or {}).get("target_world_axis", [0.0, 0.0, -1.0])
+        )
+        tol_deg = float(profile["tolerance_deg"])
+        if class_spec.level_active:
+            # For a level class BOTH endpoints must lie on the level manifold AND
+            # be connectable by a level-preserving path. Two *independently* drawn
+            # level configs sit in disconnected IK charts (huge joint steps ->
+            # ~0% yield), while base-jitter's ~0.08 rad micro-moves are trivial.
+            # So: draw a diverse independent level start, then a level GOAL within
+            # a bounded joint neighborhood of it (same chart, real motion).
+            start_joint = goal_sampler.sample_level_joint(
+                rng, local_axis=local_axis, target_world_axis=target_axis, tol_deg=tol_deg
+            )[0]
+            goal_witness_joint = None
+            reachable_pose = None
+            if start_joint is not None:
+                goal_witness_joint, _gdev = goal_sampler.sample_level_neighbor(
+                    rng,
+                    start_joint,
+                    local_axis=local_axis,
+                    target_world_axis=target_axis,
+                    tol_deg=tol_deg,
+                    radius_rad=float(profile["joint_jitter_rad"]) * _LEVEL_NEIGHBOR_MAX_FACTOR,
+                    min_radius_rad=float(profile["joint_jitter_rad"]) * _LEVEL_NEIGHBOR_MIN_FACTOR,
+                )
+                if goal_witness_joint is not None:
+                    reachable_pose = goal_sampler.fk_pose(goal_witness_joint)
+            if start_joint is None or reachable_pose is None:
+                # Rejection budget exhausted: fall back to a base-jitter start/goal
+                # (both near the curated level base config) so the request is still
+                # feasible rather than dropped.
+                start_joint = [
+                    round(float(v) + rng.uniform(-float(profile["joint_jitter_rad"]),
+                                                 float(profile["joint_jitter_rad"])), 6)
+                    for v in base.get("start_joint", [])
+                ]
+                pose = [
+                    base_pose[0] + rng.uniform(-position_jitter, position_jitter),
+                    base_pose[1] + rng.uniform(-position_jitter, position_jitter),
+                    base_pose[2] + rng.uniform(-position_jitter, position_jitter),
+                    *base_pose[3:7],
+                ]
+                pose[3:7] = _level_align_quat(pose[3:7], local_axis, target_axis)
+            else:
+                pose = list(reachable_pose)
+                # Snap orientation exactly onto the manifold (FK is within tol_deg;
+                # the projection removes the residual so the goal is exactly level).
+                pose[3:7] = _level_align_quat(pose[3:7], local_axis, target_axis)
+        else:
+            # No level gate: a wide independent start is fine; goal is any
+            # reachable FK pose.
+            start_scale = float(profile["joint_jitter_rad"]) * 6.0
+            start_joint = [
+                round(float(value) + rng.uniform(-start_scale, start_scale), 6)
+                for value in base.get("start_joint", [])
+            ]
+            reachable_pose, goal_witness_joint = goal_sampler.sample_reachable_pose(rng)
+            pose = list(reachable_pose)
+            pose[3:7] = _normalize_quaternion(pose[3:7])
+    elif independent:
         # C1a: decorrelate start and goal. The start joint gets a *wide*
         # independent draw (a large fraction of the difficulty joint range,
         # scaled up ~6x over the correlated-jitter width) and the goal pose is
@@ -325,7 +476,12 @@ def _sample_request(
                 "seed_policy_mode": mode,
                 "base_request": str(base_path),
                 "split": split,
-                "sampling_mode": "independent" if independent else "base_jitter",
+                "sampling_mode": (
+                    "reachable_fk"
+                    if (independent and goal_sampler is not None)
+                    else ("independent" if independent else "base_jitter")
+                ),
+                "goal_witness_joint": goal_witness_joint,
                 "constraint_class": class_spec.class_id,
                 "level_active": bool(class_spec.level_active),
                 "goal_orientation_active": bool(class_spec.goal_orientation_active),
@@ -349,6 +505,7 @@ def generate_task_requests(
     val_frac: float = 0.1,
     test_frac: float = 0.2,
     independent: bool = False,
+    goal_sampler: Any | None = None,
 ) -> list[dict[str, Any]]:
     if count < 1:
         raise ValueError("count must be >= 1")
@@ -389,6 +546,7 @@ def generate_task_requests(
                 split=split,
                 independent=independent,
                 constraint_class=klass,
+                goal_sampler=goal_sampler,
             )
         )
     return tasks
@@ -433,6 +591,11 @@ def build_manifest(
         "mode_counts": _counter_from_tasks(tasks, "seed_policy_mode"),
         "split_counts": _counter_from_tasks(tasks, "split"),
         "sampling_mode_counts": _counter_from_tasks(tasks, "sampling_mode"),
+        "reachable_goal_witness_count": sum(
+            1
+            for t in tasks
+            if ((t.get("metadata") or {}).get("sampling") or {}).get("goal_witness_joint")
+        ),
         "command": command or [],
         "request_schema": {
             "required": [
@@ -473,10 +636,33 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--independent-sampling", action="store_true",
                         help="C1a: draw start joint and goal pose independently (wide) "
                              "instead of jittering a single base config twice.")
+    parser.add_argument("--reachable-goals", action="store_true",
+                        help="C1a: with --independent-sampling, draw each goal as the FK "
+                             "image of a random feasible joint config (reachable by "
+                             "construction) instead of a blind workspace-box pose. "
+                             "Requires a GPU + cuRobo; eliminates infeasible-goal waste.")
+    parser.add_argument("--robot-config", type=Path,
+                        default=REPO_ROOT / "configs/robot/xms5_r800_w4g3b4c_v2.yml",
+                        help="Robot config YAML used to build the FK model for "
+                             "--reachable-goals (default: SR5).")
+    parser.add_argument("--goal-device", default="cuda:0",
+                        help="CUDA device for the reachable-goal FK model.")
     args = parser.parse_args(argv)
 
     base_paths = args.base_request or [DEFAULT_BASE_REQUEST]
     modes = _parse_modes(args.modes)
+
+    goal_sampler = None
+    if args.reachable_goals:
+        if not args.independent_sampling:
+            parser.error("--reachable-goals requires --independent-sampling")
+        from tools.dataset.reachable_goals import ReachableGoalSampler
+
+        goal_sampler = ReachableGoalSampler(
+            robot_config_path=Path(args.robot_config),
+            device=str(args.goal_device),
+        )
+
     tasks = generate_task_requests(
         base_request_paths=base_paths,
         count=int(args.count),
@@ -488,6 +674,7 @@ def main(argv: list[str] | None = None) -> int:
         val_frac=float(args.val_frac),
         test_frac=float(args.test_frac),
         independent=bool(args.independent_sampling),
+        goal_sampler=goal_sampler,
     )
     write_requests_jsonl(tasks, args.out)
     manifest_path = args.manifest_out or args.out.with_suffix(".manifest.json")

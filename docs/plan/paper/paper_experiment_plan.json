@@ -495,12 +495,18 @@
           "completed": true,
           "depends_on": [],
           "details": [
-            "可与 A 并行起草，但数据实跑等 A1。"
+            "可与 A 并行起草，但数据实跑等 A1。",
+            "[实现] 新增 tools/dataset/reachable_goals.py: 用 cuRobo Kinematics (from_data_dict) 做 GPU FK。--reachable-goals 模式下目标位姿取随机可行关节的 FK 像，可达性由构造保证 (关节本身即一组有效 IK 解)，消除盲采工作空间盒 ~98% 不可达浪费。",
+            "[level 类] LP/LPO 两端都须在 level 流形上且可连通：仅让目标 level 时独立宽采起点 (~10.7deg 偏离) 得 0% 产出；两端独立 level 采样又落在不连通 IK chart (关节步长超限) 仍 0%。最终用 sample_level_joint (GPU 拒绝采样得 level 起点) + sample_level_neighbor (在起点关节球 [min,max] 内采 level 目标，同一 chart 可连通、又非平凡运动)。",
+            "[非 level 类] PP/PPO: 宽独立起点 + 任意可达 FK 目标。",
+            "[C2 标定] LP medium: 邻域半径系数=joint_jitter_rad×3.0 得 9.0% diffusion-positive 产出 (高于 base-jitter 8.5% 参考)，且运动真实多样 (~0.36 rad vs base-jitter 平凡 ~0.08 rad)。默认写入 _LEVEL_NEIGHBOR_MAX_FACTOR=3.0，可用 LEVEL_NEIGHBOR_MAX_FACTOR 环境变量覆盖。",
+            "witness 关节写入 metadata.sampling.goal_witness_joint 供复现；manifest 记录 reachable_goals 标志。"
           ],
           "files": [
-            "tools/dataset/sample_tasks.py"
+            "tools/dataset/sample_tasks.py",
+            "tools/dataset/reachable_goals.py"
           ],
-          "uncertainty": "可达性/IK 预检过滤的实现与拒绝率。"
+          "uncertainty": "已解决：可达性由 FK 构造保证；level 连通性由邻域采样保证；拒绝率在 medium tol 下为 0 fallback。"
         },
         {
           "id": "C1b",
