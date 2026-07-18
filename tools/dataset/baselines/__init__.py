@@ -24,4 +24,17 @@ from __future__ import annotations
 # not prevent the others from registering.
 from . import curobo_soft_cost as _curobo_soft_cost  # noqa: F401
 
-__all__ = ["_curobo_soft_cost"]
+# OMPL-backed baselines need the optional
+# ``ompl`` wheel. Guard the import so hosts without it still load the other
+# baselines; the runner raises a clear error at call time via
+# ``ompl_bridge.require_ompl``.
+_OMPL_IMPORT_ERROR: str | None = None
+try:
+    from . import ompl_rrtc as _ompl_rrtc  # noqa: F401
+
+    _OMPL_BASELINES = ["_ompl_rrtc"]
+except Exception as _exc:  # pragma: no cover - depends on host env
+    _OMPL_IMPORT_ERROR = f"{type(_exc).__name__}: {_exc}"
+    _OMPL_BASELINES = []
+
+__all__ = ["_curobo_soft_cost", *_OMPL_BASELINES]

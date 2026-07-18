@@ -307,8 +307,8 @@
         {
           "id": "B3b",
           "description": "真实 RRT-Connect (外部，B1 定 scope)：按 B1 结论集成 OMPL RRTConnect 或 pRRTC，吃 SR5 URDF + 我们的碰撞世界；写 adapter 把路径转成我们的轨迹格式 + 构造 CandidateRecord (source_type=external_rrt_connect) 过同一验收器。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "B0",
             "B1",
@@ -323,7 +323,8 @@
             "level_planner_core 或 tools/ 下新 adapter 模块",
             "tools/dataset/run_closed_loop_benchmark.py"
           ],
-          "uncertainty": "高——外部依赖，scope 由 B1 决定。"
+          "uncertainty": "已解除：CuroboV2 环境已安装 OMPL 2.0.1，wheel metadata 为 BSD-3-Clause。",
+          "completion_note": "B3b 完成 (2026-07-18)。新增 tools/dataset/baselines/ompl_bridge.py 与 ompl_rrtc.py：RealVectorStateSpace 使用 SR5 URDF 关节限位；目标关节构型复用 CuRobo IK；StateValidityChecker 复用 A1 世界碰撞查询；RRTConnect 路径重采样到 planner action horizon；外部几何路径按 URDF velocity limit × speed_scale 生成统一 dt，使 v/a/jerk/motion_time 有量纲；结果经同一 evaluate_hard_constraints，只有完整 hard-valid 才返回 success，并支持标准 result/candidates/lifecycle artifacts。新增 4 个 bridge/预算/注册单测，项目共 24 tests 全绿。A100 端到端 smoke：OMPL 0.383s 找到无碰路径，A1 collision checked safe(min_distance=0.005m)，dimensioned=true(vmax=1.570796rad/s)，但全过程水平最大偏差 167.08°，因此正确返回 failed_hard_validation/failed_alignment_constraint；benchmark v2 正确统计 final_success=0、violation_rate=1、source_type=external_ompl_rrtc。该结果验证 B3b 作为无约束采样式下限及统一硬验收语义。"
         },
         {
           "id": "B3c",
