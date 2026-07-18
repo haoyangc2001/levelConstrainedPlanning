@@ -20,6 +20,7 @@ C5 "ablate-to-off" variants stay faithful. C5 flips one flag per variant.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -115,8 +116,21 @@ class GaussianDiffusion1D:
             # actually signal (low noise), not where it is essentially noise.
             snr_weight = self.alpha_bars[timesteps]  # [B], in (0,1]
             aux_loss, aux_parts = self._aux_losses(x0_hat, condition, aux, snr_weight)
-            total = total + aux_loss
-            components.update(aux_parts)
+            # Stability guard: at high-noise timesteps x0_hat is an amplified
+            # reconstruction that can occasionally land on a degenerate joint config
+            # whose FK alignment gradient is Inf/NaN; unguarded, clip_grad_norm then
+            # propagates NaN and poisons the whole run (observed: healthy through
+            # epoch 3, NaN at epoch 4 on an unseeded run). Drop a non-finite aux term
+            # for that batch so one bad reconstruction can't kill training.
+            if torch.isfinite(aux_loss):
+                total = total + aux_loss
+                components.update(aux_parts)
+            else:
+                components["l_aux_skipped_nonfinite"] = 1.0
+                components.update({k: float("nan") for k in aux_parts})
+            components["aux_loss"] = (
+                float(aux_loss.detach().item()) if torch.isfinite(aux_loss) else float("nan")
+            )
         components["total"] = float(total.detach().item())
         if return_components:
             return total, components
@@ -144,6 +158,12 @@ class GaussianDiffusion1D:
         traj = x0_hat
         if aux.denormalize is not None:
             traj = aux.denormalize(x0_hat)
+        # Clamp reconstructed joints to a generous physical range (+-2*pi rad) BEFORE
+        # FK. At high-noise t the 1/sqrt(alpha_bar) reconstruction can produce absurd
+        # joint values whose FK/alignment gradient is Inf/NaN; clamping keeps FK inputs
+        # finite while staying wide enough not to bias in-range reconstructions. This
+        # is the primary NaN guard; the finite-check in training_loss is the net.
+        traj = traj.clamp(-2.0 * math.pi, 2.0 * math.pi)
         batch, horizon, dof = traj.shape
         flat = traj.reshape(batch * horizon, dof)
         if snr_weight is None:

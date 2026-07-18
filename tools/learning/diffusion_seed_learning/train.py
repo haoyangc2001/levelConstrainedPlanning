@@ -120,6 +120,7 @@ def main() -> None:
         losses = []
         comp_accum: dict[str, float] = {}
         model.train()
+        skipped_batches = 0
         for batch in loader:
             x0 = batch["trajectory"].to(device)
             condition = batch["condition"].to(device)
@@ -128,7 +129,18 @@ def main() -> None:
             )
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            # The differentiable L_level backprops FK through x0_hat, whose
+            # 1/sqrt(alpha_bar) reconstruction at high-noise t can yield a *finite*
+            # loss with non-finite gradients. clip_grad_norm then turns those into NaN
+            # weights and poisons the run (observed: healthy to ~epoch 12, then NaN).
+            # Guard: compute the grad norm, and skip the optimizer step entirely when
+            # any gradient is non-finite. clip_grad_norm_ returns the pre-clip total
+            # norm, which is inf/nan iff some grad is non-finite.
+            total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            if not torch.isfinite(loss) or not torch.isfinite(total_norm):
+                optimizer.zero_grad(set_to_none=True)
+                skipped_batches += 1
+                continue
             optimizer.step()
             losses.append(float(loss.item()))
             for key, value in components.items():
@@ -136,7 +148,12 @@ def main() -> None:
         epoch_loss = sum(losses) / max(len(losses), 1)
         n_batches = max(len(losses), 1)
         comp_mean = {key: value / n_batches for key, value in comp_accum.items()}
-        history.append({"epoch": epoch, "loss": epoch_loss, "components": comp_mean})
+        history.append({
+            "epoch": epoch,
+            "loss": epoch_loss,
+            "components": comp_mean,
+            "skipped_batches": skipped_batches,
+        })
         checkpoint = {
             "model_state_dict": model.state_dict(),
             "model_config": model_config,
