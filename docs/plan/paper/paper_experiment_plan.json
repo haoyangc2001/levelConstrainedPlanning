@@ -606,8 +606,8 @@
         {
           "id": "C3",
           "description": "重训 diffusion + critic：走 Phase-8 训练路径，参照旧项目 Phase-10 超参并按 C2 正样本数校准 batch。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "C2"
           ],
@@ -628,7 +628,8 @@
           "uncertainty": "batch 须按正样本数校准 (DataLoader clamp)。",
           "l_collision_descope_note": "C3b 复核：L_level 走 cuRobo 可微 FK，梯度真回传（已 smoke 验证）；但 aux_guidance.make_collision_cost_fn 经 planner._evaluate_collision 做了 .detach().cpu().tolist() 再 torch.full 重建标量 → 零梯度、对权重无作用。按反 over-claim：主『全组件』模型只训 L_level；collision-awareness 真实存在但在 A1 验证期（validators._evaluate_collision）生效，非 diffusion 训练损失。故 C5 消融只关唯一真训练开关 L_level，不得声称切换已训练的 L_collision 损失。见 memory lcp-c3-lcollision-nondifferentiable。",
           "l_level_weight_calibration_note": "L_level 权重标定：CLI 默认 0.1 会让 aux 梯度达 base 的 ~990 倍 (实测 base gnorm=0.0345 vs raw aux gnorm=341.7)，clip_grad_norm(1.0) 后梯度 ~99.9% 是 aux → 去噪完全学不动 (base_mse 卡在 ~2.9e5，240 epoch 无改善)。修复：diffusion.py 对 aux 项按 per-sample alpha_bar (SNR) 加权 + 主模型用 level_weight=1e-5。验证：base_mse 0.59→0.12 (与纯 MSE 同轨) 且 l_level 单调下降 3977→759 (惩罚真在引导)。clean-x0 对齐角 max 2.81deg<3.0 容差 → 真实数据 l_level=0，损失定义正确。见 memory lcp-c3-llevel-weight-calibration。破损档存为 *_BROKEN_level_weight_0.1。",
-          "main_model_train_cmd": "train.py --epochs 240 --batch-size 64 --hidden-dim 128 --diffusion-steps 64 --horizon 32 --lr 1e-3 --enable-l-level --level-weight 1e-5 --planner-config configs/sr5_level.yaml --samples runs/c2_keeplevel/train.jsonl"
+          "main_model_train_cmd": "train.py --epochs 240 --batch-size 64 --hidden-dim 128 --diffusion-steps 64 --horizon 32 --lr 1e-3 --enable-l-level --level-weight 1e-5 --planner-config configs/sr5_level.yaml --samples runs/c2_keeplevel/train.jsonl",
+          "implementation_note": "重训完成 (2026-07-18)。主『全组件』diffusion: c3_diffusion_allcomp_20260718 (240ep/bs64/hidden128/steps64/horizon32, 3196 diffusion-positives from runs/c2_keeplevel/train.jsonl, best_loss=0.0193, 无 NaN)。仅启用 L_level (可微 FK 对齐损失), 校准 level_weight=1e-5 (见 l_level_weight_calibration_note): 未校准时 aux 梯度是 base 的 ~990×, 去噪学不动 (base_mse 卡在 ~2.9e5); 1e-5 下 base_mse 0.61→0.019 且 l_level 4064→54 单调下降, 真做 guidance。L_collision 保持 OFF (detached 零梯度, 降级为验证期 A1)。critic: c3_critic_20260718 (160ep/bs64/hidden128/horizon32, 24635 labeled, best_loss=0.2996)。两者已注册进 artifacts/current_artifacts.json (旧 phase10 模型存 legacy_phase10_*, 顶层 dataset 同步为 c2_keeplevel)。SNR(ᾱ)加权已加入 diffusion.py aux 项 (commit 96b468a)。"
         },
         {
           "id": "C3b",

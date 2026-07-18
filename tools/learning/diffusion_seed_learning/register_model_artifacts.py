@@ -85,6 +85,10 @@ def _model_section(checkpoint_dir: Path, metadata: dict[str, Any], kind: str) ->
     if kind == "diffusion":
         section["diffusion_steps"] = metadata.get("diffusion_steps") or metadata.get("diffusion_config", {}).get("steps")
         section["diffusion_config"] = metadata.get("diffusion_config") or {}
+        # Record which auxiliary loss components were trained (L_level etc.), so the
+        # artifact pointer unambiguously identifies the "all-components" main model vs
+        # C5 ablation variants where a component is turned off.
+        section["aux_loss_config"] = metadata.get("aux_loss_config") or {}
     else:
         section["positive_count"] = metadata.get("positive_count")
         section["negative_count"] = metadata.get("negative_count")

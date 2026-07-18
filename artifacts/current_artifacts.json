@@ -8,6 +8,290 @@
     "sha256": "c11fb62a2b2b5b39537b23469da0593abc197d2d4136238e3a27b24598709134"
   },
   "dataset": {
+    "name": "c2_keeplevel",
+    "sample_count": 54952,
+    "candidate_count": 54952,
+    "request_count": 4221,
+    "positive_for_diffusion": 3196,
+    "positive_for_critic": 1069,
+    "negative_for_critic": 53883,
+    "source_type_counts": {
+      "diffusion_seed": 16884,
+      "planner_native": 12744,
+      "rule_raw_seed": 12662,
+      "rule_seed": 12662
+    },
+    "candidate_status_counts": {
+      "failed_planner": 21505,
+      "failed_precheck": 8699,
+      "raw_seed_parent_only": 21104,
+      "success": 3644
+    },
+    "difficulty_bucket_counts": {
+      "easy": 18574,
+      "hard": 17968,
+      "medium": 18410
+    },
+    "obstacle_case_counts": {
+      "multi": 2000,
+      "none": 2000,
+      "single": 2000
+    },
+    "training_dataset": {
+      "path": "runs/c2_keeplevel/train.jsonl",
+      "exists": true,
+      "size_bytes": 302863267,
+      "sha256": "7e31961ff63498e9057cb0011ea07c62bd8ee777b2f69efec528d64fcac1a70b"
+    },
+    "dataset_manifest": {
+      "path": "runs/c2_keeplevel/train.manifest.json",
+      "exists": true,
+      "size_bytes": 537362,
+      "sha256": "9343963437b95a9b4c8c9d956dc818a1b7f157e490fb9ccd895830b07aacf92a"
+    },
+    "validator_report": {
+      "path": "runs/c2_keeplevel/train.validation.json",
+      "exists": true,
+      "size_bytes": 595,
+      "sha256": "33b2ad63a9021bb8792bf23266c40f687167c9b070ad7bbec78006d473bc7b4c"
+    },
+    "batch_summary": {
+      "path": "runs/c2_keeplevel/lifecycle/batch_summary.json",
+      "exists": true,
+      "size_bytes": 3401274,
+      "sha256": "3a094e55de713799b9d1f9ef9d6f7769940363b6d186d20fecb2123490b5933c"
+    },
+    "sampling_manifest": {
+      "path": "runs/c2_keeplevel/manifest_lp.json",
+      "exists": true,
+      "size_bytes": 1716,
+      "sha256": "ba062b94ca3e4abd2b51da539d57686babec730cbfa7675fbac31758105e4809"
+    }
+  },
+  "diffusion": {
+    "run_name": "c3_diffusion_allcomp_20260718",
+    "checkpoint_dir": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/c3_diffusion_allcomp_20260718",
+    "best_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/c3_diffusion_allcomp_20260718/best.pt",
+    "last_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/c3_diffusion_allcomp_20260718/last.pt",
+    "metadata": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/c3_diffusion_allcomp_20260718/metadata.json",
+    "epochs": 240,
+    "batch_size": 64,
+    "hidden_dim": 128,
+    "horizon": 32,
+    "sample_count": 3196,
+    "best_loss": 0.019331371334070962,
+    "samples_path": "../../../runs/c2_keeplevel/train.jsonl",
+    "samples_sha256": "7e31961ff63498e9057cb0011ea07c62bd8ee777b2f69efec528d64fcac1a70b",
+    "model_config": {
+      "dof": 6,
+      "condition_dim": 15,
+      "hidden_dim": 128
+    },
+    "hyperparameters": {
+      "epochs": 240,
+      "batch_size": 64,
+      "lr": 0.001,
+      "device": "cuda:0"
+    },
+    "best_checkpoint_file": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/c3_diffusion_allcomp_20260718/best.pt",
+      "exists": true,
+      "size_bytes": 1151769,
+      "sha256": null
+    },
+    "metadata_file": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/c3_diffusion_allcomp_20260718/metadata.json",
+      "exists": true,
+      "size_bytes": 69902,
+      "sha256": "74843c29ee3b5f020f5aba5ef3446a2f91a520880f83965f812b5a66a97f2635"
+    },
+    "diffusion_steps": 64,
+    "diffusion_config": {
+      "steps": 64
+    },
+    "aux_loss_config": {
+      "enable_l_level": true,
+      "enable_l_collision": false,
+      "level_weight": 1e-05,
+      "collision_weight": 0.0,
+      "tolerance_deg": 3.0,
+      "active": true
+    }
+  },
+  "critic": {
+    "run_name": "c3_critic_20260718",
+    "checkpoint_dir": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/c3_critic_20260718",
+    "best_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/c3_critic_20260718/best.pt",
+    "last_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/c3_critic_20260718/last.pt",
+    "metadata": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/c3_critic_20260718/metadata.json",
+    "epochs": 160,
+    "batch_size": 64,
+    "hidden_dim": 128,
+    "horizon": 32,
+    "sample_count": 24635,
+    "best_loss": 0.2995970061322517,
+    "samples_path": "../../../runs/c2_keeplevel/train.jsonl",
+    "samples_sha256": "7e31961ff63498e9057cb0011ea07c62bd8ee777b2f69efec528d64fcac1a70b",
+    "model_config": {
+      "input_dim": 227,
+      "hidden_dim": 128
+    },
+    "hyperparameters": {
+      "epochs": 160,
+      "batch_size": 64,
+      "lr": 0.002,
+      "device": "cuda:0"
+    },
+    "best_checkpoint_file": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/c3_critic_20260718/best.pt",
+      "exists": true,
+      "size_bytes": 196553,
+      "sha256": null
+    },
+    "metadata_file": {
+      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/c3_critic_20260718/metadata.json",
+      "exists": true,
+      "size_bytes": 26455,
+      "sha256": "a811700b1e88b61a50273c877c578cffad4dd0b809c394c7ba89fba8dd0e76ea"
+    },
+    "positive_count": 1069,
+    "negative_count": 23566,
+    "source_type_counts": {
+      "rule_raw_seed": 12662,
+      "diffusion_seed": 8443,
+      "planner_native": 428,
+      "rule_seed": 3102
+    }
+  },
+  "generated_samples": {
+    "path": "/pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_diffusion_generated_samples.json",
+    "exists": true,
+    "size_bytes": 56329,
+    "sha256": null
+  },
+  "offline_generation_report": {
+    "path": "/pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_offline_generation_report.json",
+    "exists": true,
+    "size_bytes": 912,
+    "sha256": "4a8f57dab5a2b50b0243b6863c5eabf8a1968d037cefea56a7eca928ae4e9f69"
+  },
+  "safety_notes": [
+    "diffusion_seed_mode remains off by default in launch config.",
+    "candidate mode remains blocked for real robot unless diffusion_seed_allow_real_robot_candidate is explicitly true.",
+    "The model is a trajectory seed generator; CuRobo repair and hard validation remain mandatory."
+  ],
+  "large_file_policy": "Do not commit dataset JSONL, lifecycle run directories, or checkpoint .pt files.",
+  "legacy_phase10_dataset": {
+    "name": "sr5_phase10_20260715_baseline_jitter_train",
+    "sample_count": 993,
+    "candidate_count": 833,
+    "validated_candidate_count": 833,
+    "positive_for_diffusion": 140,
+    "positive_for_critic": 140,
+    "training_dataset": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/datasets/sr5_phase10_20260715_baseline_jitter_train/samples_validated.jsonl",
+      "exists": true,
+      "size_bytes": 382655246,
+      "sha256": null
+    },
+    "dataset_manifest": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/datasets/sr5_phase10_20260715_baseline_jitter_train/manifest.json",
+      "exists": true,
+      "size_bytes": 44418,
+      "sha256": "f6d71bd4687d26ef2c226219df5d4a78c07136fa07ac911cab4ffca786359162"
+    },
+    "dataset_summary": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_20260715_baseline_jitter_train_dataset_summary.json",
+      "exists": true,
+      "size_bytes": 1148,
+      "sha256": "7af28893b1e82e0de323365131cb2463a28c77942c4c6aaf8feaaa456cba9614"
+    },
+    "validator_report": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_20260715_baseline_jitter_train_validator_report.json",
+      "exists": true,
+      "size_bytes": 2340,
+      "sha256": "815c21b2e3ce54557947b648936bdfc0360476d1f21843cecdf90461069a7dbb"
+    }
+  },
+  "updated_at": "2026-07-18T07:38:26.775078+00:00",
+  "closed_loop_dataset_pointer": {
+    "path": "artifacts/closed_loop_dataset_pointer.json",
+    "git_commit": "88fece28dd88e905c09ec9dcff4f8f6ccde06eec",
+    "dataset_name": "sr5_closed_loop_phase7_smoke_20260715"
+  },
+  "legacy_phase10_diffusion": {
+    "run_name": "sr5_phase10_mature_diffusion_20260715",
+    "checkpoint_dir": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715",
+    "best_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt",
+    "last_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/last.pt",
+    "metadata": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/metadata.json",
+    "epochs": 240,
+    "batch_size": 64,
+    "hidden_dim": 128,
+    "diffusion_steps": 64,
+    "horizon": 32,
+    "sample_count": 140,
+    "best_loss": 0.09602215141057968,
+    "best_checkpoint_file": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt",
+      "exists": true,
+      "size_bytes": 1151577,
+      "sha256": null
+    },
+    "metadata_file": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/metadata.json",
+      "exists": true,
+      "size_bytes": 16392,
+      "sha256": "3ada86e93d3a9a24332d5a89a1c39ea4fe082ed28ac0c4061576febdb1870e73"
+    }
+  },
+  "legacy_phase10_critic": {
+    "run_name": "sr5_phase10_success_critic_20260715",
+    "checkpoint_dir": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715",
+    "best_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/best.pt",
+    "last_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/last.pt",
+    "metadata": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/metadata.json",
+    "epochs": 160,
+    "batch_size": 64,
+    "hidden_dim": 128,
+    "sample_count": 833,
+    "positive_count": 140,
+    "negative_count": 693,
+    "best_loss": 0.18526157434098423,
+    "best_checkpoint_file": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/best.pt",
+      "exists": true,
+      "size_bytes": 196553,
+      "sha256": null
+    },
+    "metadata_file": {
+      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/metadata.json",
+      "exists": true,
+      "size_bytes": 26030,
+      "sha256": "f9b4a1a9821d385981ba5758e8c786661c38b6e197075d4c2e4b660235fbd8d0"
+    }
+  },
+  "git_commit": "6af288f44021c0167815c953838a1dd5c3050576",
+  "closed_loop_benchmark": {
+    "report": {
+      "path": null,
+      "exists": false,
+      "size_bytes": null,
+      "sha256": null
+    },
+    "summary": {
+      "path": null,
+      "exists": false,
+      "size_bytes": null,
+      "sha256": null
+    }
+  },
+  "runtime_resolution": {
+    "config": "configs/sr5_level.yaml",
+    "artifact_pointer": "/home/caohy/repositories/levelConstrainedPlanning/artifacts/current_artifacts.json",
+    "note": "LevelPlannerConfig loads diffusion/critic best_checkpoint from this pointer when load_model_paths_from_artifacts=true."
+  },
+  "legacy_phase7_dataset": {
     "name": "sr5_closed_loop_phase7_smoke_20260715",
     "sample_count": 44,
     "candidate_count": 44,
@@ -67,219 +351,8 @@
       "sha256": "324eeafea3d080333d4ffb6ce741d72d4c6109925cd9a29bcfa47029290994d6"
     }
   },
-  "diffusion": {
-    "run_name": "sr5_closed_loop_phase8_diffusion_20260715",
-    "checkpoint_dir": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715",
-    "best_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/best.pt",
-    "last_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/last.pt",
-    "metadata": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/metadata.json",
-    "epochs": 80,
-    "batch_size": 4,
-    "hidden_dim": 64,
-    "horizon": 32,
-    "sample_count": 3,
-    "best_loss": 0.34562963247299194,
-    "samples_path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl",
-    "samples_sha256": "ef63ecaa75e50bb1b58fb81bd8ca7d3b727e34059359a071854ede98a5d1dba7",
-    "model_config": {
-      "dof": 6,
-      "condition_dim": 15,
-      "hidden_dim": 64
-    },
-    "hyperparameters": {
-      "epochs": 80,
-      "batch_size": 4,
-      "lr": 0.001,
-      "device": "cuda:0"
-    },
-    "best_checkpoint_file": {
-      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/best.pt",
-      "exists": true,
-      "size_bytes": 300697,
-      "sha256": null
-    },
-    "metadata_file": {
-      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_diffusion_20260715/metadata.json",
-      "exists": true,
-      "size_bytes": 6308,
-      "sha256": "89a52fdfc1937958a9fe87a3a7cb0c21eb9fe8d2781bed9cc207f2cc7960e40d"
-    },
-    "diffusion_steps": 32,
-    "diffusion_config": {
-      "steps": 32
-    }
-  },
-  "critic": {
-    "run_name": "sr5_closed_loop_phase8_success_critic_20260715",
-    "checkpoint_dir": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715",
-    "best_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/best.pt",
-    "last_checkpoint": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/last.pt",
-    "metadata": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/metadata.json",
-    "epochs": 120,
-    "batch_size": 8,
-    "hidden_dim": 128,
-    "horizon": 32,
-    "sample_count": 31,
-    "best_loss": 0.11679375679523218,
-    "samples_path": "/pub/data/caohy/levelConstrainedPlanning/datasets/sr5_closed_loop_phase7_smoke_20260715/samples_validated.jsonl",
-    "samples_sha256": "ef63ecaa75e50bb1b58fb81bd8ca7d3b727e34059359a071854ede98a5d1dba7",
-    "model_config": {
-      "input_dim": 227,
-      "hidden_dim": 128
-    },
-    "hyperparameters": {
-      "epochs": 120,
-      "batch_size": 8,
-      "lr": 0.002,
-      "device": "cuda:0"
-    },
-    "best_checkpoint_file": {
-      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/best.pt",
-      "exists": true,
-      "size_bytes": 196617,
-      "sha256": null
-    },
-    "metadata_file": {
-      "path": "/pub/data/caohy/levelConstrainedPlanning/checkpoints/sr5_closed_loop_phase8_success_critic_20260715/metadata.json",
-      "exists": true,
-      "size_bytes": 20490,
-      "sha256": "0f0e80c4780177377fab2b4336c87002c87d6c8d360b794cb32c052a3d008121"
-    },
-    "positive_count": 2,
-    "negative_count": 29,
-    "source_type_counts": {
-      "rule_seed": 2,
-      "rule_raw_seed": 8,
-      "diffusion_seed": 8,
-      "planner_native": 13
-    }
-  },
-  "generated_samples": {
-    "path": "/pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_diffusion_generated_samples.json",
-    "exists": true,
-    "size_bytes": 56329,
-    "sha256": null
-  },
-  "offline_generation_report": {
-    "path": "/pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_offline_generation_report.json",
-    "exists": true,
-    "size_bytes": 912,
-    "sha256": "4a8f57dab5a2b50b0243b6863c5eabf8a1968d037cefea56a7eca928ae4e9f69"
-  },
-  "safety_notes": [
-    "diffusion_seed_mode remains off by default in launch config.",
-    "candidate mode remains blocked for real robot unless diffusion_seed_allow_real_robot_candidate is explicitly true.",
-    "The model is a trajectory seed generator; CuRobo repair and hard validation remain mandatory."
-  ],
-  "large_file_policy": "Do not commit dataset JSONL, lifecycle run directories, or checkpoint .pt files.",
-  "legacy_phase10_dataset": {
-    "name": "sr5_phase10_20260715_baseline_jitter_train",
-    "sample_count": 993,
-    "candidate_count": 833,
-    "validated_candidate_count": 833,
-    "positive_for_diffusion": 140,
-    "positive_for_critic": 140,
-    "training_dataset": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/datasets/sr5_phase10_20260715_baseline_jitter_train/samples_validated.jsonl",
-      "exists": true,
-      "size_bytes": 382655246,
-      "sha256": null
-    },
-    "dataset_manifest": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/datasets/sr5_phase10_20260715_baseline_jitter_train/manifest.json",
-      "exists": true,
-      "size_bytes": 44418,
-      "sha256": "f6d71bd4687d26ef2c226219df5d4a78c07136fa07ac911cab4ffca786359162"
-    },
-    "dataset_summary": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_20260715_baseline_jitter_train_dataset_summary.json",
-      "exists": true,
-      "size_bytes": 1148,
-      "sha256": "7af28893b1e82e0de323365131cb2463a28c77942c4c6aaf8feaaa456cba9614"
-    },
-    "validator_report": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/reports/sr5_phase10_20260715_baseline_jitter_train_validator_report.json",
-      "exists": true,
-      "size_bytes": 2340,
-      "sha256": "815c21b2e3ce54557947b648936bdfc0360476d1f21843cecdf90461069a7dbb"
-    }
-  },
-  "updated_at": "2026-07-15T16:31:02.552276+00:00",
-  "closed_loop_dataset_pointer": {
-    "path": "artifacts/closed_loop_dataset_pointer.json",
-    "git_commit": "88fece28dd88e905c09ec9dcff4f8f6ccde06eec",
-    "dataset_name": "sr5_closed_loop_phase7_smoke_20260715"
-  },
-  "legacy_phase10_diffusion": {
-    "run_name": "sr5_phase10_mature_diffusion_20260715",
-    "checkpoint_dir": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715",
-    "best_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt",
-    "last_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/last.pt",
-    "metadata": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/metadata.json",
-    "epochs": 240,
-    "batch_size": 64,
-    "hidden_dim": 128,
-    "diffusion_steps": 64,
-    "horizon": 32,
-    "sample_count": 140,
-    "best_loss": 0.09602215141057968,
-    "best_checkpoint_file": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/best.pt",
-      "exists": true,
-      "size_bytes": 1151577,
-      "sha256": null
-    },
-    "metadata_file": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_mature_diffusion_20260715/metadata.json",
-      "exists": true,
-      "size_bytes": 16392,
-      "sha256": "3ada86e93d3a9a24332d5a89a1c39ea4fe082ed28ac0c4061576febdb1870e73"
-    }
-  },
-  "legacy_phase10_critic": {
-    "run_name": "sr5_phase10_success_critic_20260715",
-    "checkpoint_dir": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715",
-    "best_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/best.pt",
-    "last_checkpoint": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/last.pt",
-    "metadata": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/metadata.json",
-    "epochs": 160,
-    "batch_size": 64,
-    "hidden_dim": 128,
-    "sample_count": 833,
-    "positive_count": 140,
-    "negative_count": 693,
-    "best_loss": 0.18526157434098423,
-    "best_checkpoint_file": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/best.pt",
-      "exists": true,
-      "size_bytes": 196553,
-      "sha256": null
-    },
-    "metadata_file": {
-      "path": "/pub/data/caohy/tashan_Manipulation/diffusionSeedLearning/checkpoints/sr5_phase10_success_critic_20260715/metadata.json",
-      "exists": true,
-      "size_bytes": 26030,
-      "sha256": "f9b4a1a9821d385981ba5758e8c786661c38b6e197075d4c2e4b660235fbd8d0"
-    }
-  },
-  "git_commit": "1c86e179c2b1e144cba2e5b113fa30e88e30e4c9",
-  "closed_loop_benchmark": {
-    "report": {
-      "path": "docs/reports/phase8_closed_loop_benchmark_report.md",
-      "exists": true,
-      "size_bytes": 635,
-      "sha256": "0f15eb359a8602e7fc7d368840ee2d2532e7b41ef05e70a8249919ca7c008ff6"
-    },
-    "summary": {
-      "path": "/pub/data/caohy/levelConstrainedPlanning/reports/sr5_closed_loop_phase8_benchmark_summary.json",
-      "exists": true,
-      "size_bytes": 11015,
-      "sha256": "afef9df28d70096bb35ab44ddd32ad0f702fd2bb6d661792336086e0c47ea334"
-    }
-  },
-  "runtime_resolution": {
-    "config": "configs/sr5_level.yaml",
-    "artifact_pointer": "artifacts/current_artifacts.json",
-    "note": "LevelPlannerConfig loads diffusion/critic best_checkpoint from this pointer when load_model_paths_from_artifacts=true."
+  "dataset_source_pointer": {
+    "path": "runs/c2_keeplevel/dataset_pointer.json",
+    "note": "C3 trains diffusion+critic on the C2 keep-level train split (train.jsonl); this block mirrors the C2 dataset pointer."
   }
 }
