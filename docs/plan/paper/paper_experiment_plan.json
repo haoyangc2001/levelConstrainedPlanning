@@ -655,7 +655,7 @@
         {
           "id": "C4",
           "description": "验证核心假设 (用现成比较器，含统计)：run_closed_loop_benchmark.py --strategies rule_only,diffusion_only,diffusion_critic,mixed_fallback 在 C0c 冻结的 test 请求集上跑，同一预算语义 (A3.0)、每设定 ≥3 种子重复 (A3.8)、报 Wilson CI + 配对 McNemar，按预注册阈值判 go/no-go。",
-          "status": "pending",
+          "status": "in_progress",
           "completed": false,
           "depends_on": [
             "C3",
@@ -673,7 +673,8 @@
             "tools/dataset/run_closed_loop_benchmark.py"
           ],
           "uncertainty": "高——重训后学习种子仍可能不超过规则种子 (计划最大不确定项之一)。",
-          "review_change": "审查(多视角命中)：C4 补 test-split-only、预算语义对齐 A3.0、≥3 种子重复、Wilson CI + McNemar、预注册 go/no-go 阈值、独立几何校验——破自证循环 + 无统计协议。"
+          "review_change": "审查(多视角命中)：C4 补 test-split-only、预算语义对齐 A3.0、≥3 种子重复、Wilson CI + McNemar、预注册 go/no-go 阈值、独立几何校验——破自证循环 + 无统计协议。",
+          "implementation_note": "C4 launched (2026-07-18): closed-loop benchmark on FROZEN TEST split (1169/6000 requests, split-filtered from runs/c2_keeplevel/requests.jsonl) x 4 strategies {rule_only, diffusion_only, critic_selected, mixed_fallback} x 3 repeat seeds, resume-enabled -> runs/c4_test_eval/, report runs/c4_test_eval/report.json. Diffusion/critic strategies load the C3 checkpoints via load_model_paths_from_artifacts (current_artifacts.json -> c3_diffusion_allcomp/c3_critic). Wilson CI emitted by runner; PAIRED McNemar go/no-go authored in tools/dataset/c4_significance.py (exact binomial on discordant pairs, scipy, unit-tested vs scipy.binomtest). PRE-REGISTERED rule: learned method SUPERIOR_TO_RULE iff delta>0 AND exact-McNemar p<0.05 AND Wilson CIs disjoint; else NOT_SHOWN_SUPERIOR. Problem-level pairing via per-problem majority bit across seeds. Independent geometry verification (align-angle recompute) pending post-run."
         },
         {
           "id": "C5",
