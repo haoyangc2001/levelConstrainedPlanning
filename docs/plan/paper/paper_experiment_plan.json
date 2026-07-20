@@ -760,8 +760,8 @@
         {
           "id": "D2",
           "description": "生成 E1 请求集 (每组 100 独立 start-goal 对，维度条件化 + test 命名空间)：用 C1 扩展后的 sample_tasks.py 出请求集，规模随 C1b/C0b 落地与否条件化，请求 id 落 C0c 的 test 命名空间。",
-          "status": "pending",
-          "completed": false,
+          "status": "descoped",
+          "completed": true,
           "depends_on": [
             "D1",
             "C0c",
@@ -777,13 +777,14 @@
             "tools/dataset/sample_tasks.py"
           ],
           "uncertainty": "依赖 C1a + 条件依赖 C1b/C0b；维度随其落地情况伸缩。",
-          "review_change": "审查：D2 请求集维度条件化 (1200/300/100 随 C1b/C0b)，并落在 C0c 的 test 命名空间——防近重复请求 + 训练/评测泄漏。"
+          "review_change": "审查：D2 请求集维度条件化 (1200/300/100 随 C1b/C0b)，并落在 C0c 的 test 命名空间——防近重复请求 + 训练/评测泄漏。",
+          "implementation_note": "Descoped by D1 HOLD gate (2026-07-20). The full E1 request-set expansion was meant to feed D3/D4/D5. Since C4 did not show learning superior to rule_only, D1 explicitly skips the full recompute path. The frozen C4 test split (1169 requests from runs/c2_keeplevel/requests.jsonl) remains the traceable first-slice evaluation set for the fallback paper narrative."
         },
         {
           "id": "D3",
           "description": "E1 横向仿真矩阵：完整闭环 + 保底集 (B2/B3a/B4) + 约束强制型对手 (B5 或 B3c 至少一个) + B3b(若就绪) 在 D2 请求集上跑，每设定 ≥3 种子重复，收集成功率(含 Wilson CI)/约束误差分布/碰撞/延迟 -> A4.2 转 paper_result -> E1 表。",
-          "status": "pending",
-          "completed": false,
+          "status": "descoped",
+          "completed": true,
           "depends_on": [
             "D2",
             "C3",
@@ -803,13 +804,14 @@
             "A4 转换器"
           ],
           "uncertainty": "算力密集；外部 baseline 就绪度决定方法数，D2 维度与 D1 门决定规模。",
-          "review_change": "审查：D3 显式依赖 C3(checkpoint) + 强制含约束强制型对手(B5/B3c) + ≥3 种子 + Wilson CI + 配对 McNemar；规模随 D2 条件化。"
+          "review_change": "审查：D3 显式依赖 C3(checkpoint) + 强制含约束强制型对手(B5/B3c) + ≥3 种子 + Wilson CI + 配对 McNemar；规模随 D2 条件化。",
+          "implementation_note": "Descoped by D1 HOLD gate (2026-07-20). A/B/C are ready, but C4 failed the pre-registered learned-superior gate. Per D1, do not spend the D3 full simulation-matrix compute by default. Existing C4 benchmark artifacts provide the first-slice SR5 comparison; broader E1 matrix is future work unless the user overrides the HOLD decision."
         },
         {
           "id": "D4",
           "description": "E2 时间预算曲线 (Fig.4)：在密集障碍子集 (C0c test split) 上，用 A3.0 的真预算截断 + A3 --budget-values x --k-values 扫描；Success@K 后处理 candidate_records 不重跑；≥3 种子重复出带 CI 误差带的 Fig.4；曲线明确标注预算语义 (fixed wall-clock vs additive vs compute-budget)。",
-          "status": "pending",
-          "completed": false,
+          "status": "descoped",
+          "completed": true,
           "depends_on": [
             "D1",
             "C3",
@@ -825,13 +827,14 @@
             "tools/dataset/run_closed_loop_benchmark.py"
           ],
           "uncertainty": "高——正面结果不保证；且可能证伪贡献(2)固定预算下界。",
-          "review_change": "审查：D4 绑 A3.0 真预算语义 + test split + ≥3 种子 CI，并登记为贡献(2)下界保证的验证/证伪图。"
+          "review_change": "审查：D4 绑 A3.0 真预算语义 + test split + ≥3 种子 CI，并登记为贡献(2)下界保证的验证/证伪图。",
+          "implementation_note": "Descoped by D1 HOLD gate (2026-07-20). C4 at K=6/budget=6 already falsified the positive fixed-budget learning claim for this checkpoint family: diffusion_only and diffusion_critic had zero success; mixed_fallback improved rule_only by only 0.56 percentage points and was NOT_SHOWN_SUPERIOR under Wilson+McNemar. Do not run the larger D4 curve by default; treat E2 as a negative/diagnostic result in the fallback narrative."
         },
         {
           "id": "D5",
           "description": "补齐 E3 缺失档 + 时间匹配对照，再跑 6 档消融：第 2 档硬门 on/off toggle、第 6 档组件消融 (用 C5 的消融 checkpoint)、wall-clock 预算匹配对照，在混合场景 (test split) 跑全部档，带 CI/显著性。",
-          "status": "pending",
-          "completed": false,
+          "status": "descoped",
+          "completed": true,
           "depends_on": [
             "D1",
             "C5"
@@ -849,7 +852,8 @@
             "tools/learning/diffusion_seed_learning/"
           ],
           "uncertainty": "第 6 档消融 checkpoint 由 C5 提供；算力随档数×种子数增。",
-          "review_change": "审查：D5 第6档改依赖 C5 真实消融 checkpoint；补 ≥3 种子/CI；wall-clock 匹配档标注为贡献(2)下界证伪点。"
+          "review_change": "审查：D5 第6档改依赖 C5 真实消融 checkpoint；补 ≥3 种子/CI；wall-clock 匹配档标注为贡献(2)下界证伪点。",
+          "implementation_note": "Descoped by D1 HOLD gate (2026-07-20). Since C5 was also descoped and the learning-superiority claim is not supported by C4, the full ablation table would consume compute without changing the paper decision. Replace D5 with D5b negative-result diagnostics for the fallback narrative."
         },
         {
           "id": "D5b",
