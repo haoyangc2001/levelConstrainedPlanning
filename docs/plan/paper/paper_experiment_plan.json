@@ -1014,8 +1014,8 @@
         {
           "id": "E3w",
           "description": "补全 references.bib (Related Work + Table I 的前置)：补 6 篇 + GPMP2 的真实 author/venue/arXiv ID，修 PRESTO 占位、IKFlow 年份、去 and others 截断。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [],
           "details": [
             "cpRRTC 2505.06791、McVAMP 2604.13323、VAMP 2309.14545、pRRTC 2503.06757、DiffusionSeeder 2410.16727、IKLink 2402.16154、GPMP2 1707.07383。",
@@ -1026,7 +1026,8 @@
             "docs/paper/references.bib"
           ],
           "uncertainty": "arXiv ID 须逐条核对 (部分为推断)。",
-          "review_change": "审查：E3w 逐条枚举 7+1 篇 arXiv ID，明确 CSVTO 条目 (关联 B3c) 并给 CSVTO TODO 一个终态 (补齐或删除)。"
+          "review_change": "审查：E3w 逐条枚举 7+1 篇 arXiv ID，明确 CSVTO 条目 (关联 B3c) 并给 CSVTO TODO 一个终态 (补齐或删除)。",
+          "implementation_note": "Completed on 2026-07-20. references.bib now includes cpRRTC/arXiv:2505.06791, McVAMP/arXiv:2604.13323, VAMP/arXiv:2309.14545, pRRTC/arXiv:2503.06757, DiffusionSeeder/arXiv:2410.16727, IKLink/arXiv:2402.16154, GPMP2/arXiv:1707.07383, and CSVTO/arXiv:2308.12110. Fixed PRESTO placeholder with arXiv:2409.16012 metadata, corrected IKFlow to arXiv:2111.08933 / RA-L 2022, and removed all 'and others' / placeholder authors from references.bib. Verified arXiv title+author metadata through the arXiv API for the added arXiv-backed entries; bibtex executable is not installed in this environment, so validation used brace balance plus placeholder scans."
         },
         {
           "id": "E4w",

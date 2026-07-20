@@ -4,12 +4,13 @@
 % A few starter entries covering the core related-work areas are below.
 % ============================================================================
 
-@article{curobo2023,
-  title   = {{CuRobo}: Parallelized Collision-Free Robot Motion Generation},
-  author  = {Sundaralingam, Balakumar and others},
-  journal = {IEEE International Conference on Robotics and Automation (ICRA)},
-  year    = {2023},
-  note    = {arXiv:2310.17274}
+@misc{curobo2023,
+  title         = {{cuRobo}: Parallelized Collision-Free Minimum-Jerk Robot Motion Generation},
+  author        = {Sundaralingam, Balakumar and Hari, Siva Kumar Sastry and Fishman, Adam and Garrett, Caelan and Van Wyk, Karl and Blukis, Valts and Millane, Alexander and Oleynikova, Helen and Handa, Ankur and Ramos, Fabio and Ratliff, Nathan and Fox, Dieter},
+  year          = {2023},
+  eprint        = {2310.17274},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.RO}
 }
 
 @inproceedings{berenson2009cbirrt,
@@ -42,9 +43,23 @@
 
 @article{ikflow,
   title   = {{IKFlow}: Generating Diverse Inverse Kinematics Solutions},
-  author  = {Ames, Barrett and Morgan, Andrew and Konidaris, George},
+  author  = {Ames, Barrett and Morgan, Jeremy and Konidaris, George},
   journal = {IEEE Robotics and Automation Letters (RA-L)},
-  year    = {2022}
+  volume  = {7},
+  number  = {3},
+  pages   = {7177--7184},
+  year    = {2022},
+  doi     = {10.1109/LRA.2022.3181374},
+  note    = {arXiv:2111.08933}
+}
+
+@misc{iklink2024,
+  title         = {{IKLink}: End-Effector Trajectory Tracking with Minimal Reconfigurations},
+  author        = {Wang, Yeping and Sifferman, Carter and Gleicher, Michael},
+  year          = {2024},
+  eprint        = {2402.16154},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.RO}
 }
 
 @inproceedings{chomp,
@@ -63,9 +78,69 @@
 
 @article{trajopt,
   title   = {Motion Planning with Sequential Convex Optimization and Convex Collision Checking},
-  author  = {Schulman, John and others},
+  author  = {Schulman, John and Duan, Yan and Ho, Jonathan and Lee, Alex and Awwal, Ibrahim and Bradlow, Henry and Pan, Jia and Patil, Sachin and Goldberg, Ken and Abbeel, Pieter},
   journal = {The International Journal of Robotics Research (IJRR)},
-  year    = {2014}
+  volume  = {33},
+  number  = {9},
+  pages   = {1251--1270},
+  year    = {2014},
+  doi     = {10.1177/0278364914528132}
+}
+
+@article{gpmp2,
+  title         = {Continuous-Time Gaussian Process Motion Planning via Probabilistic Inference},
+  author        = {Mukadam, Mustafa and Dong, Jing and Yan, Xinyan and Dellaert, Frank and Boots, Byron},
+  journal       = {The International Journal of Robotics Research (IJRR)},
+  volume        = {37},
+  number        = {11},
+  pages         = {1319--1340},
+  year          = {2018},
+  note          = {arXiv:1707.07383}
+}
+
+@misc{csvto2023,
+  title         = {Constrained Stein Variational Trajectory Optimization},
+  author        = {Power, Thomas and Berenson, Dmitry},
+  year          = {2023},
+  eprint        = {2308.12110},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.RO}
+}
+
+@inproceedings{vamp2024,
+  title     = {Motions in Microseconds via Vectorized Sampling-Based Planning},
+  author    = {Thomason, Wil and Kingston, Zachary and Kavraki, Lydia E.},
+  booktitle = {IEEE International Conference on Robotics and Automation (ICRA)},
+  pages     = {8749--8756},
+  year      = {2024},
+  doi       = {10.1109/ICRA57147.2024.10611190},
+  note      = {arXiv:2309.14545}
+}
+
+@inproceedings{prrtc2026,
+  title     = {{pRRTC}: {GPU}-Parallel {RRT}-Connect for Fast, Consistent, and Low-Cost Motion Planning},
+  author    = {Huang, Chih H. and Jadhav, Pranav and Plancher, Brian and Kingston, Zachary},
+  booktitle = {IEEE International Conference on Robotics and Automation (ICRA)},
+  year      = {2026},
+  note      = {arXiv:2503.06757}
+}
+
+@misc{cprrtc2025,
+  title         = {{cpRRTC}: {GPU}-Parallel {RRT}-Connect for Constrained Motion Planning},
+  author        = {Hu, Jiaming and Wang, Jiawei and Christensen, Henrik},
+  year          = {2025},
+  eprint        = {2505.06791},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.RO}
+}
+
+@misc{mcvamp2026,
+  title         = {Vectorizing Projection in Manifold-Constrained Motion Planning for Real-Time Whole-Body Control},
+  author        = {Iyer, Shrutheesh R. and Chang, I-Chia and Liu, Andrew Z. and Gu, Yan and Kingston, Zachary},
+  year          = {2026},
+  eprint        = {2604.13323},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.RO}
 }
 
 @article{diffuser2022,
@@ -78,22 +153,31 @@
 
 @article{mpd2023,
   title   = {Motion Planning Diffusion: Learning and Planning of Robot Motions with Diffusion Models},
-  author  = {Carvalho, Joao and others},
-  journal = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  author  = {Carvalho, Joao and Le, An T. and Baierl, Mark and Koert, Dorothea and Peters, Jan},
+  journal = {arXiv preprint arXiv:2308.01557},
   year    = {2023},
   note    = {arXiv:2308.01557}
 }
 
-@article{presto2024,
-  title   = {{PRESTO}: Fast Motion Planning Using Diffusion Models Based on Key Configuration Environment Representation},
-  author  = {Author, A. and others},
-  journal = {arXiv preprint},
-  year    = {2024}
+@inproceedings{diffusionseeder2024,
+  title     = {{DiffusionSeeder}: Seeding Motion Optimization with Diffusion for Rapid Motion Planning},
+  author    = {Huang, Huang and Sundaralingam, Balakumar and Mousavian, Arsalan and Murali, Adithyavairavan and Goldberg, Ken and Fox, Dieter},
+  booktitle = {Conference on Robot Learning (CoRL)},
+  year      = {2024},
+  note      = {arXiv:2410.16727}
+}
+
+@inproceedings{presto2024,
+  title   = {{PRESTO}: Fast Motion Planning Using Diffusion Models Based on Key-Configuration Environment Representation},
+  author  = {Seo, Mingyo and Cho, Yoonyoung and Sung, Yoonchang and Stone, Peter and Zhu, Yuke and Kim, Beomjoon},
+  booktitle = {IEEE International Conference on Robotics and Automation (ICRA)},
+  year    = {2025},
+  note    = {arXiv:2409.16012}
 }
 
 @article{diffusionpolicy2023,
   title   = {Diffusion Policy: Visuomotor Policy Learning via Action Diffusion},
-  author  = {Chi, Cheng and others},
+  author  = {Chi, Cheng and Xu, Zhenjia and Feng, Siyuan and Cousineau, Eric and Du, Yilun and Burchfiel, Benjamin and Tedrake, Russ and Song, Shuran},
   journal = {Robotics: Science and Systems (RSS)},
   year    = {2023},
   note    = {arXiv:2303.04137}

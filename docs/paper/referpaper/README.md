@@ -60,7 +60,7 @@ Notes:
 - Not on arXiv (cite from original venues): CHOMP (ICRA 2009), STOMP (ICRA 2011),
   TrajOpt (IJRR 2014), TSR/CBiRRT (ICRA 2009), TRAC-IK (Humanoids 2015),
   RelaxedIK (RSS 2018), IKFast/OpenRAVE, OMPL constrained planning.
-- The "Sampling Constrained Trajectories Using Composable Diffusion Models"
-  (CSVTO) paper cited in the design docs was not resolved via the arXiv title
-  search; look it up manually and add it here if a preprint exists.
+- CSVTO is resolved in `../references.bib` as "Constrained Stein Variational
+  Trajectory Optimization" by Power and Berenson (arXiv:2308.12110). It is kept
+  as the B3c constrained-optimization reference; no local PDF has been added yet.
 - BibTeX keys should be added to `../references.bib` as these get cited.
