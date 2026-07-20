@@ -1,0 +1,36 @@
+{
+  "schema_version": "e9w_paper_internal_review.v1",
+  "created_at": "2026-07-20",
+  "task_id": "E9w",
+  "source_checks": {
+    "main_tex_placeholder_free": true,
+    "missing_cites": [],
+    "missing_refs": [],
+    "missing_figures": [],
+    "title_abstract_intro_problem_has_curobo": false,
+    "title_abstract_intro_problem_has_self_improving": false,
+    "used_cite_count": 19,
+    "label_count": 18,
+    "ref_count": 7,
+    "figures": [
+      "fig1_teaser.png",
+      "fig2_system.png",
+      "fig3_seed_construction.png",
+      "fig4_success_at_k.png"
+    ]
+  },
+  "build_tools": {
+    "latexmk": "missing",
+    "pdflatex": "missing",
+    "xelatex": "missing",
+    "tectonic": "missing",
+    "bibtex": "missing"
+  },
+  "build_status": "not_run_build_tools_unavailable",
+  "scope_notes": [
+    "All paper text is SR5-only; CR7 and old hardware numbers are not used as first-party paper results.",
+    "The title, abstract, introduction, and problem formulation avoid naming cuRobo and avoid self-improving claims.",
+    "The learned branch is written as fallback-safe architecture plus a falsifiable efficiency hypothesis after the C4 NOT_SHOWN_SUPERIOR result.",
+    "PDF/page-count/undefined-citation build cleanup still requires a LaTeX installation."
+  ]
+}

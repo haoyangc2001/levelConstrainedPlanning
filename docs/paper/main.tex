@@ -478,10 +478,23 @@ remains an unproven hypothesis.
 
 \section{Conclusion}
 \label{sec:conclusion}
-Placeholder.
+We presented a verified fallback architecture for orientation-constrained
+manipulation planning on the SR5 platform. The central design choice is to
+decouple constraint satisfaction from the soft objective: construct
+manifold-aware seeds before optimization, then accept trajectories only through
+a hard post-optimization validator. The resulting pipeline is useful both as a
+planner and as a source of labeled success and failure data for learned seeding.
+
+The current evidence supports the decoupled rule-seeding and validation
+pipeline, but it does not show that learned seeds outperform the verified rule
+branch under a matched fixed compute budget. We therefore treat the learned
+branch as a fallback-safe integration architecture and a falsifiable efficiency
+hypothesis. Future work should focus on broader constraint classes, stronger
+learned coverage of repairable basins, and a new hardware execution bridge with
+first-party real-robot trials.
 
 \section*{Acknowledgment}
-Placeholder.
+Acknowledgments are omitted for anonymous review.
 
 \bibliographystyle{IEEEtran/bibtex/IEEEtran}
 \bibliography{references}
