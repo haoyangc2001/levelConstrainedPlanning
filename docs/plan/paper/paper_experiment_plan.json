@@ -907,12 +907,11 @@
         {
           "id": "D7",
           "description": "独立几何校验 + 汇总成表/图 + 诚实分层叙事：先用与训练标签不同实现的独立校验器复算 test 上报成功轨迹的 max_alignment_deviation/碰撞 (破同尺子自证)；再把所有 paper_result 喂 A4.3 生成器 (Table I/II、Fig.4，带 CI)；E1/E4 写成已验证结论，E2/E3 若 C4 负面则写『假设+协议+初步基线』；每个数字对齐 runs/reports/ 的 artifact。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
-            "D3",
-            "D4",
-            "D5",
+            "D1",
+            "C4",
             "D5b",
             "D6"
           ],
@@ -922,12 +921,22 @@
             "叙事按 C4/D4 结果三层分层 (见 critical_path_and_risks 的 honest_layering)。"
           ],
           "files": [
-            "A4.3 图表生成器",
-            "新独立几何校验模块",
+            "tools/dataset/c4_geometry_verify.py",
+            "tools/dataset/d7_independent_collision_audit.py",
+            "tools/dataset/paper_result.py",
+            "tools/dataset/paper_charts.py",
+            "reports/d7_c4_geometry_verify.json",
+            "reports/d7_independent_collision_audit.json",
+            "reports/d7_independent_collision_audit.md",
+            "reports/d7_c4_paper_results.jsonl",
+            "reports/d7_paper_assets/fig4_success_at_k.json",
+            "reports/d7_paper_assets/table_main_results.md",
+            "reports/d7_summary.md",
             "docs/paper/"
           ],
           "uncertainty": "叙事分层取决于 C4/D4 结果。",
-          "review_change": "审查：D7 前置一个独立几何校验器 (第二套 FK/对齐实现) 破自证循环；依赖补 D5b。"
+          "review_change": "审查：D7 前置一个独立几何校验器 (第二套 FK/对齐实现) 破自证循环；依赖补 D5b。",
+          "implementation_note": "Completed on 2026-07-20 under the D1 HOLD fallback branch. Converted C4 benchmark v2 to reports/d7_c4_paper_results.jsonl (12 paper_result.v1 rows) and generated A4.3 artifacts reports/d7_paper_assets/fig4_success_at_k.json plus table_main_results.md; matplotlib was unavailable, so no PNG was rendered. Independent alignment audit reports/d7_c4_geometry_verify.json scanned 14028 selected trajectory files, checked 1578 successful level-active trajectories, and found 0 false successes under per-request tolerances. Added tools/dataset/d7_independent_collision_audit.py for an independent URDF-FK + collision-sphere + oriented-box world-collision audit; reports/d7_independent_collision_audit.json checked 1578 successful trajectories against the configured planner world, ignored the fixed base link to match C4 dynamic sphere count (64 total spheres minus 10 base spheres = 54 validator spheres), and found 0 independent world collisions. D7 outputs support the fallback/diagnostic narrative only; full D3/D4/D5 tables remain descoped by HOLD."
         }
       ]
     },

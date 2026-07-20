@@ -1,0 +1,43 @@
+{
+  "figure": "success_at_k_curve",
+  "x": "K",
+  "y": "success_at_k",
+  "series": {
+    "rule_only": [
+      {
+        "K": 6,
+        "success_at_k": 0.221557,
+        "wilson_lo": 0.198683,
+        "wilson_hi": 0.246254,
+        "n_cells": 3
+      }
+    ],
+    "diffusion_only": [
+      {
+        "K": 6,
+        "success_at_k": 0.0,
+        "wilson_lo": 0.0,
+        "wilson_hi": 0.003275,
+        "n_cells": 3
+      }
+    ],
+    "diffusion_critic": [
+      {
+        "K": 6,
+        "success_at_k": 0.0,
+        "wilson_lo": 0.0,
+        "wilson_hi": 0.003275,
+        "n_cells": 3
+      }
+    ],
+    "mixed_fallback": [
+      {
+        "K": 6,
+        "success_at_k": 0.2284,
+        "wilson_lo": 0.205248,
+        "wilson_hi": 0.253332,
+        "n_cells": 3
+      }
+    ]
+  }
+}
