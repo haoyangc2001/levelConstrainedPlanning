@@ -858,10 +858,11 @@
         {
           "id": "D5b",
           "description": "负面结果诊断实验 (即使学习不赢闭环仍有价值的可证伪主张)：若 C4/D4 显示完整闭环不优于纯规则，跑一组机理诊断给出学习环仍有价值的第一方证据——(a) critic 筛掉高失败种子是否降 p98 尾延；(b) 失败回流数据是否可复用/提升后续轮次；(c) B2 λ-sweep vs 硬门的对齐误差-成功率对照。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
-            "D4"
+            "C4",
+            "D1"
           ],
           "details": [
             "(a) critic 尾延主张：注意 critic.py 的 collision_risk 现恒 0——须先经 A1 真实碰撞标签重训 critic 才能声称碰撞相关价值，登记此依赖 (无 A1 重训 critic 则不作该主张)。",
@@ -870,11 +871,15 @@
             "所有主张须可证伪 + 配 test split 支撑实验，喂 E6w/E8w 的诚实叙事。"
           ],
           "files": [
+            "tools/dataset/d5b_negative_diagnostics.py",
+            "reports/d5b_negative_diagnostics.json",
+            "reports/d5b_negative_diagnostics.md",
             "tools/dataset/run_closed_loop_benchmark.py",
             "tools/learning/diffusion_seed_learning/"
           ],
           "uncertainty": "中——是负面兜底路径，仅在 C4/D4 负面时触发；critic 主张依赖 A1 重训。",
-          "review_change": "审查：新增 D5b 负面结果诊断，为『学习不赢闭环仍有价值』提供可证伪的第一方证据 (贡献2/3 塌陷时的兜底论据)。"
+          "review_change": "审查：新增 D5b 负面结果诊断，为『学习不赢闭环仍有价值』提供可证伪的第一方证据 (贡献2/3 塌陷时的兜底论据)。",
+          "implementation_note": "Completed after C4 significance + D1 HOLD gate (2026-07-20). Generated reports/d5b_negative_diagnostics.json and reports/d5b_negative_diagnostics.md from runs/c4_test_eval/result.json plus runs/c4_test_eval/c4_significance.json. Result: pure learned branches had zero hard-valid success; mixed_fallback beat rule_only by only 0.006843 fixed-budget success rate and its successes were dominated by rule fallback. Paper narrative remains fallback architecture + failure taxonomy; do not claim self-improving learned superiority."
         },
         {
           "id": "D6",
