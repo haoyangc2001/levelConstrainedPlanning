@@ -679,8 +679,8 @@
         {
           "id": "C5",
           "description": "组件消融重训 (为 D5 第6档提供模型)：基于 C3b 的开关，逐个关闭 L_level / L_collision / 多样性筛选各重训一个变体，产出可在 test 上对比的 checkpoint 集。",
-          "status": "pending",
-          "completed": false,
+          "status": "descoped",
+          "completed": true,
           "depends_on": [
             "C3",
             "C3b"
@@ -698,7 +698,8 @@
             "tools/learning/diffusion_seed_learning/register_model_artifacts.py"
           ],
           "uncertainty": "中——算力随变体数线性增；D5 第6档硬依赖它。",
-          "review_change": "审查：C5 消融轴校正为『L_level 训练损失关/开』+『critic 多样性筛选推理期关/开』两条真实轴；L_collision 因零梯度从训练消融删除 (反 over-claim)。"
+          "review_change": "审查：C5 消融轴校正为『L_level 训练损失关/开』+『critic 多样性筛选推理期关/开』两条真实轴；L_collision 因零梯度从训练消融删除 (反 over-claim)。",
+          "implementation_note": "Descoped by D1 HOLD gate (2026-07-20). C5 only serves D5's full ablation table; D1 concluded that C4 did not show learned or mixed methods superior to rule_only at matched compute budget, so the plan switches to fallback narrative and skips full D3/D4/D5 recompute by default. Therefore no extra ablation checkpoints are trained now. L_level on/off and critic diversity ablations remain future work if the user explicitly reopens the self-improving-learning claim."
         }
       ]
     },
