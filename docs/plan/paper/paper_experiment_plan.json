@@ -1052,8 +1052,8 @@
         {
           "id": "E5w",
           "description": "画三张概念图 (Fig.1/2/3，不需 D 数据，用 dataviz 技能)：先调 dataviz 保持风格一致。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "E0"
           ],
@@ -1064,9 +1064,14 @@
             "导出到 docs/paper/figures/。"
           ],
           "files": [
-            "docs/paper/figures/"
+            "tools/paper/draw_concept_figures.py",
+            "docs/paper/figures/fig1_teaser.png",
+            "docs/paper/figures/fig2_system.png",
+            "docs/paper/figures/fig3_seed_construction.png",
+            "docs/paper/main.tex"
           ],
-          "uncertainty": "无。"
+          "uncertainty": "无。",
+          "implementation_note": "Completed on 2026-07-20. The requested dataviz skill is not available in this session, so the figures are generated reproducibly by tools/paper/draw_concept_figures.py using Pillow. Generated docs/paper/figures/fig1_teaser.png (constraint manifold + verified fallback), fig2_system.png (pipeline + learning loop), and fig3_seed_construction.png (goal-relative seed construction + branch-consistent IK). main.tex now includes Fig.1-3 via includegraphics; Fig.4 remains data-dependent."
         },
         {
           "id": "E6w",
