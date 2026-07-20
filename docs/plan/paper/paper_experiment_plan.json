@@ -959,14 +959,15 @@
         {
           "id": "E0",
           "description": "重构 main.tex 骨架 (先于任何正文)：把 Problem Formulation -> Problem Formulation & Structural Limitations；三个 Method 子节合并成单一 System Design (IV-A 总览 / IV-B 解耦约束满足 / IV-C 从可靠规划器到数据引擎 / IV-D 自改进闭环)；加 Fig.1-4 + Table I 的 float 占位 + label，保留 tab:main 作 Table II，保留 eq:level 单一定义。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [],
           "details": [],
           "files": [
             "docs/paper/main.tex"
           ],
-          "uncertainty": "无。"
+          "uncertainty": "无。",
+          "implementation_note": "Completed on 2026-07-20. main.tex now has Problem Formulation and Structural Limitations plus a single System Design section with IV-A overview, IV-B Decoupled Constraint Satisfaction, IV-C From a Reliable Planner to a Data Engine, and IV-D Self-Improving Closed Loop. Added LaTeX placeholder floats for Fig.1-4, Table I (tab:related), and kept tab:main as the Table II ablation placeholder; eq:level remains the single definition of the level constraint."
         },
         {
           "id": "E1w",
