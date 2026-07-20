@@ -1032,8 +1032,8 @@
         {
           "id": "E4w",
           "description": "起草 Related Work (II) + 建 Table I 骨架：四类关联工作 (采样式约束；IK 方法；轨迹优化；学习式 seeding/扩散)，每类以『我们如何不同』收尾。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "E3w"
           ],
@@ -1046,7 +1046,8 @@
             "docs/paper/main.tex"
           ],
           "uncertainty": "throughput 量化格待 D；constraint-class 列取决于 C1b 是否落地。",
-          "review_change": "审查：E4w 的 Table I constraint-class 列条件化——C1b descope 则删列并改由其它维度差异化。"
+          "review_change": "审查：E4w 的 Table I constraint-class 列条件化——C1b descope 则删列并改由其它维度差异化。",
+          "implementation_note": "Completed on 2026-07-20. Filled Related Work with four groups: projection/sampling constrained planning, IK methods, trajectory optimization, and learning-based seeding/diffusion. Each group ends with the distinction from this work. Table I (tab:related) is now a qualitative table* with projection, constraint scope, throughput style, closed-loop, and learning-target columns over cpRRTC/McVAMP/DiffusionSeeder/PRESTO/ours. C1b is done rather than descoped, so the constraint-scope column is retained. Checked all cite keys used by main.tex are present in references.bib."
         },
         {
           "id": "E5w",

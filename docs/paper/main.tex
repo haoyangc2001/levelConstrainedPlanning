@@ -101,24 +101,66 @@ Placeholder.
 % IK-based methods (IKFast, TRAC-IK, RelaxedIK, IKFlow).
 % Trajectory optimization (CHOMP, STOMP, TrajOpt, GPMP, CuRobo).
 % Learning-based seeding (DiffusionSeeder, Motion Planning Diffusion, PRESTO).
-Placeholder.
+Sampling-based constrained planners represent path constraints explicitly and
+often rely on projection to remain on the feasible manifold. Classical
+constraint-manifold planners such as CBiRRT/TSR methods
+\cite{berenson2009cbirrt} and surveys of constrained sampling
+\cite{kingston2018sampling} establish the projection-based view. Recent systems
+such as VAMP, pRRTC, cpRRTC, and McVAMP vectorize this family for high-throughput
+planning on modern hardware \cite{vamp2024,prrtc2026,cprrtc2025,mcvamp2026}.
+These methods are strong references for constraint satisfaction, but their
+projection operators are embedded inside search. Our system instead places
+manifold awareness before local optimization and uses hard post-verification
+afterward, trading projection completeness for a batched optimizer pipeline with
+fallback.
 
-\begin{table}[t]
-\caption{Qualitative positioning of related constrained-planning methods (placeholder).}
+Inverse-kinematics methods address a different subproblem: generating joint
+solutions for desired tool poses. TRAC-IK and RelaxedIK improve robustness and
+real-time feasibility for generic IK \cite{trac-ik,relaxedik}, while IKFlow
+models diverse IK solutions and IKLink explicitly reduces configuration
+switches along end-effector trajectories \cite{ikflow,iklink2024}. We use IK in
+the same spirit, but only as a seed-construction component. The planning problem
+still requires full-path continuity, collision checking, motion quality, and
+post-optimization validation.
+
+Trajectory-optimization methods such as CHOMP, STOMP, TrajOpt, GPMP2, and
+cuRobo optimize smooth collision-aware motion efficiently
+\cite{chomp,stomp,trajopt,gpmp2,curobo2023}. They are natural downstream
+refiners for dense joint trajectories, but when path constraints are represented
+as soft penalties they inherit the degradation and initialization-sensitivity
+issues described in Sec.~\ref{sec:problem}. Our contribution is not a new
+optimizer. It is a constraint-aware wrapper that constructs manifold-near seeds,
+repairs them with a batched optimizer, and separates optimizer convergence from
+task success through a hard validator.
+
+Learning-based motion planning and seeding methods use generative models to
+accelerate planning. Diffuser and Motion Planning Diffusion model trajectory
+distributions for planning with diffusion guidance \cite{diffuser2022,mpd2023};
+DiffusionSeeder and PRESTO are closer to our setting because they generate seeds
+or key configurations that are then refined by a downstream optimizer
+\cite{diffusionseeder2024,presto2024}. Our distinction is the closed-loop
+contract: learned samples are candidates only, failures train a separate critic
+rather than becoming positive diffusion targets, and a verified rule branch
+remains available as fallback. Table~\ref{tab:related} summarizes the resulting
+positioning.
+
+\begin{table*}[t]
+\caption{Qualitative positioning of related constrained-planning methods.}
 \label{tab:related}
 \centering
-\begin{tabular}{lcccc}
+\scriptsize
+\begin{tabular}{llllll}
 \toprule
-Method & Projection & Throughput & Closed loop & Target \\
+Method & Projection & Constraint scope & Throughput style & Closed loop & Learning target \\
 \midrule
-cpRRTC & -- & -- & -- & -- \\
-McVAMP & -- & -- & -- & -- \\
-DiffusionSeeder & -- & -- & -- & -- \\
-PRESTO & -- & -- & -- & -- \\
-Ours & -- & -- & -- & -- \\
+cpRRTC \cite{cprrtc2025} & In-search & Manifold constraints & GPU RRT-Connect & No & None \\
+McVAMP \cite{mcvamp2026} & Vectorized & Whole-body manifolds & SIMD projection & No & None \\
+DiffusionSeeder \cite{diffusionseeder2024} & No hard projection & General motion & Diffusion seeding + refinement & No & Optimizer seeds \\
+PRESTO \cite{presto2024} & No hard projection & General motion & Key-configuration diffusion & No & Key configurations \\
+Ours & Post-verified & Orientation-path classes & Batched refinement + fallback & Yes & Repairable seed distribution \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 \section{Problem Formulation and Structural Limitations}
 \label{sec:problem}
