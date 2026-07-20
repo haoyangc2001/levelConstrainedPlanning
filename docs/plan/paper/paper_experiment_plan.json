@@ -2,8 +2,8 @@
   "document_name": "Level Constrained Planning 论文实验工作计划 (Paper Experiment Plan)",
   "version": "1.2",
   "created_date": "2026-07-17",
-  "last_updated": "2026-07-18",
-  "revision_note": "v1.2：进入逐任务执行阶段。回补 A1 hard-acceptance 语义：最终 success 现在必须来自完整 hard validator 有效候选；首选候选硬失败时继续在有效集合内做 level-first 选择；B4 goal-only 仅豁免 alignment，仍保留其他硬检查。新增 failed_hard_validation 状态、单元测试和真实 CuRobo 端到端复核。v1.1 的对抗性审查结论与任务结构保持不变。",
+  "last_updated": "2026-07-20",
+  "revision_note": "v1.3：C4 test-split benchmark 已完成并生成显著性判定；D1 readiness 轴全部 PASS，但 C4 go/no-go 判定为 HOLD（学习分支未按预注册规则证明优于 rule_only），后续切换到 fallback narrative，不投入 D3/D4/D5 全量重算力。v1.2：进入逐任务执行阶段。回补 A1 hard-acceptance 语义：最终 success 现在必须来自完整 hard validator 有效候选；首选候选硬失败时继续在有效集合内做 level-first 选择；B4 goal-only 仅豁免 alignment，仍保留其他硬检查。新增 failed_hard_validation 状态、单元测试和真实 CuRobo 端到端复核。v1.1 的对抗性审查结论与任务结构保持不变。",
   "purpose": "把 docs/plan/paper/paper_experiment_plan.md 转成机器可读的任务清单。终点是产出一篇会议论文 (目标会议未锁定，先打磨去风险首切片再定投 ICRA/IROS/RA-L)。本文件记录整体背景、核心目标、当前状态审计、关键决策，以及从当前代码状态到论文提交的每一个可追踪任务。",
   "companion_documents": {
     "narrative_plan": "docs/plan/paper/paper_experiment_plan.md (本文件的叙述版，含 file:line 依据)",
@@ -655,8 +655,8 @@
         {
           "id": "C4",
           "description": "验证核心假设 (用现成比较器，含统计)：run_closed_loop_benchmark.py --strategies rule_only,diffusion_only,diffusion_critic,mixed_fallback 在 C0c 冻结的 test 请求集上跑，同一预算语义 (A3.0)、每设定 ≥3 种子重复 (A3.8)、报 Wilson CI + 配对 McNemar，按预注册阈值判 go/no-go。",
-          "status": "in_progress",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "C3",
             "C0a",
@@ -674,7 +674,7 @@
           ],
           "uncertainty": "高——重训后学习种子仍可能不超过规则种子 (计划最大不确定项之一)。",
           "review_change": "审查(多视角命中)：C4 补 test-split-only、预算语义对齐 A3.0、≥3 种子重复、Wilson CI + McNemar、预注册 go/no-go 阈值、独立几何校验——破自证循环 + 无统计协议。",
-          "implementation_note": "C4 launched+running (2026-07-18): closed-loop benchmark on FROZEN TEST split (split-filter kept 1169/6000 requests from runs/c2_keeplevel/requests.jsonl; train split 4221 fed C3 -> test is genuinely held out) x 4 strategies {rule_only,diffusion_only,diffusion_critic,mixed_fallback} x 3 seeds {0,1,2}, k=6 k_accept=2 timeout=2.0s, resume-enabled -> runs/c4_test_eval/, final report runs/c4_test_eval/result.json. Diffusion/critic strategies load the C3 checkpoints via load_model_paths_from_artifacts (artifacts/current_artifacts.json -> c3_diffusion_allcomp_20260718/best.pt + c3_critic_20260718/best.pt); wiring verified by 2-req smoke (all 4 strategies ran end-to-end). POST-PROCESSING (authored+unit-tested, run after benchmark via runs/c4_postprocess.sh): (1) tools/dataset/paper_result.py -> paper_result.v1.jsonl (per_problem_success bits); (2) tools/dataset/c4_significance.py -> paired McNemar (scipy exact binomial on discordant pairs) + Wilson CI, PRE-REGISTERED go/no-go verdict: learned>rule only if delta>0 AND McNemar p<0.05 AND Wilson-lower-bound(delta)>0, else 'not shown superior'; unit-tested vs scipy on synthetic tables; (3) tools/dataset/c4_geometry_verify.py -> INDEPENDENT alignment recompute (cuRobo FK + from-scratch quat->axis->angle in numpy, NOT level_planner_core.constraints) against per-request axes+tolerance; smoke on 20 in-progress success dirs: 0 false-success, indep max-dev 0.33-2.02deg all within tol -> validator not self-confirming. LATENCY DISCIPLINE: no concurrent GPU job during the run (C5 ablation held) to keep p50/p98 clean; brief geometry smokes touched GPU only during the rule_only cell (baseline), before any diffusion-method timing cell started."
+          "implementation_note": "C4 completed (2026-07-20): closed-loop benchmark on FROZEN TEST split (split-filter kept 1169/6000 requests from runs/c2_keeplevel/requests.jsonl; train split 4221 fed C3 -> test is genuinely held out) x 4 strategies {rule_only,diffusion_only,diffusion_critic,mixed_fallback} x 3 seeds {0,1,2}, k=6 k_accept=2 timeout=2.0s, resume-enabled -> runs/c4_test_eval/, final report runs/c4_test_eval/result.json/result.md. Diffusion/critic strategies load the C3 checkpoints via load_model_paths_from_artifacts (artifacts/current_artifacts.json -> c3_diffusion_allcomp_20260718/best.pt + c3_critic_20260718/best.pt). Aggregate fixed-budget success rates: rule_only=0.221557, diffusion_only=0.0, diffusion_critic=0.0, mixed_fallback=0.2284. POST-PROCESSING: tools/dataset/c4_significance.py wrote runs/c4_test_eval/c4_significance.json with paired McNemar + Wilson CI under the pre-registered rule (learned superior iff delta>0 AND McNemar p<0.05 AND Wilson CIs disjoint). Verdicts: diffusion_only NOT_SHOWN_SUPERIOR (delta=-0.22347, p=4.53e-72), diffusion_critic NOT_SHOWN_SUPERIOR (delta=-0.22347, p=4.53e-72), mixed_fallback NOT_SHOWN_SUPERIOR (delta=+0.00563, p=0.03125, Wilson CIs overlap). Conclusion: C4 did not prove learned or mixed methods superior to rule_only at matched compute budget; D1 must take the HOLD/fallback narrative branch. Earlier geometry smoke on 20 in-progress success dirs found 0 false-success (independent max-dev 0.33-2.02deg within tolerance); full D7 geometry audit remains a later task."
         },
         {
           "id": "C5",
@@ -735,8 +735,8 @@
         {
           "id": "D1",
           "description": "A/B/C 出口校验 (花算力前的门)：逐条核验 A/B/C 就绪。任一不过 -> 回对应阶段补齐。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "D0"
           ],
@@ -751,9 +751,9 @@
           "files": [],
           "uncertainty": "无——是校验门 + go/no-go 算力闸。",
           "review_change": "审查：D1 新增 go/no-go 门 (C4 匹配预算对比作硬判据)，负面则不投 6000-plan 与 C2b 重算力；就绪清单补 A3.0/C0c/B5-or-B3c/C1b-descope 分支。",
-          "implementation_note": "D1 readiness gate checker authored: tools/dataset/d1_readiness_gate.py. Verifies A1 (collision_safety checked/safe/min_distance_m/num_spheres), A2 (dt_sec/motion_time_sec/max_jerk_rad_s3), A3/A4 (Wilson CI, p75/p98, budget/seed/method axes, per_problem_success in paper_result.py), B (baselines + adversary registered), C (artifact pointer -> C3 diffusion+critic, C2 dataset sample_count=54952 diff_pos=3196>=3000). Readiness axes all PASS. Go/no-go compute gate consumes runs/c4_test_eval/c4_significance.json when present; currently PENDING (C4 benchmark still running). Gate output: runs/c4_test_eval/d1_gate.json.",
+          "implementation_note": "D1 readiness gate completed (2026-07-20). tools/dataset/d1_readiness_gate.py verifies A1 (collision_safety checked/safe/min_distance_m/num_spheres), A2 (dt_sec/motion_time_sec/max_jerk_rad_s3), A3/A4 (Wilson CI, p75/p98, budget/seed/method axes, per_problem_success in paper_result.py), B (baselines + adversary registered), C (artifact pointer -> C3 diffusion+critic, C2 dataset sample_count=54952 diff_pos=3196>=3000). Readiness axes all PASS. After C4 significance was generated at runs/c4_test_eval/c4_significance.json, the go/no-go compute gate returned HOLD: no learned method superior to rule at matched budget. Gate output written to runs/c4_test_eval/d1_gate_after_significance.json. Decision: do not spend full D3/D4/D5 recompute by default; switch to fallback narrative (innovation B as lower-bound-safe integration architecture) and proceed to diagnostic/writing tasks unless the user explicitly overrides the HOLD gate.",
           "checker_authored": true,
-          "gate_status": "readiness_ok_verdict_pending"
+          "gate_status": "hold_fallback_narrative"
         },
         {
           "id": "D2",
