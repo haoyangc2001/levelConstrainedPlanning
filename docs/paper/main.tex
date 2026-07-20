@@ -32,9 +32,8 @@
 
 \begin{document}
 
-\title{Level-Constrained Trajectory Planning for Manipulators\\
-via Seed Construction, CuRobo Repair, and a Closed-Loop\\
-Learning--Optimization System\\
+\title{Manifold-Aware Seeding with Verified Fallback\\
+for Orientation-Constrained Manipulation Planning\\
 \thanks{This work was carried out on the SR5 manipulator platform.
 Corresponding author: (email).}}
 
@@ -58,18 +57,19 @@ Keeping a manipulator's end effector level throughout an entire path---the
 ``carrying a tray of water'' constraint---turns point-to-point planning into
 motion on a low-dimensional constraint manifold, where feasible solutions are
 scarce and gradient-based optimizers are highly sensitive to their initial
-seed. We present a level-constrained trajectory planning system for the SR5
-manipulator that (i) constructs a diverse family of rule-based level-preserving
-seeds via horizontal-pose interpolation and branch-consistent inverse
-kinematics, (ii) repairs and refines every seed with GPU-batched CuRobo
-trajectory optimization, and (iii) selects the executable trajectory with a
-level-first hard validator. We further wrap this planner in a closed-loop
-learning--optimization system---\emph{data generation, model learning,
-optimization validation, failure fallback, data update}---in which a diffusion
-seed model and a success critic learn the distribution of CuRobo-repairable
-seeds, while every learned candidate still returns to CuRobo repair, hard
-validation, and rule-based fallback. We report the constrained-planning success
-rate under a fixed time budget and analyze the contribution of each component.
+seed. We present a verified fallback architecture for level-constrained SR5
+manipulation. The planner constructs a diverse family of level-preserving seeds
+through goal-relative orientation interpolation and branch-consistent inverse
+kinematics, refines candidates with a batched trajectory optimizer, and accepts
+only trajectories that pass a level-first hard validator. We further study a
+learned seeding branch in which a diffusion model proposes repairable seed
+trajectories and a success critic ranks candidates, while all learned outputs
+remain subject to optimizer repair, hard validation, and rule-based fallback.
+On a held-out SR5 test split, the verified rule branch provides a traceable
+baseline and the learned branches are not shown superior under a matched
+fixed compute budget. The result supports the decoupled constraint-satisfaction
+pipeline and identifies learned seeding as a falsifiable efficiency hypothesis,
+not yet a demonstrated performance improvement.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -79,14 +79,49 @@ models, inverse kinematics, learning for planning
 
 \section{Introduction}
 \label{sec:intro}
-% Motivation: end-effector level (orientation-path) constraint; "carry water" tasks
-% (trays, welding, spraying, polishing). Distinguish from point-to-point planning.
-% Contribution list:
-%  1) A multi-family rule-based level seed constructor with branch-consistent IK.
-%  2) A CuRobo repair + level-first hard-validation pipeline.
-%  3) A closed-loop learning--optimization system that treats every candidate
-%     (success, failed seed, fallback recovery) as first-class training data.
-Placeholder.
+Many manipulation tasks require more than reaching a final pose. Carrying a
+tray, welding along a seam, spraying a surface, or transporting an open
+container can require the end effector to preserve an orientation relationship
+over the entire path. In this work we focus on a representative
+orientation-path constraint: keeping a tool axis aligned with a desired world
+direction throughout the trajectory. This turns a nominal point-to-point
+planning problem into motion near a thin constraint manifold, where feasible
+trajectories are sparse and joint-space continuity across IK branches matters.
+
+Mainstream optimization-based motion planning often handles such constraints by
+adding weighted penalties to a scalar objective and then running non-convex
+local descent. This creates two structural failure modes. First, a returned
+local optimum may trade away constraint satisfaction to reduce other costs.
+Second, convergence depends strongly on the initial seed; a seed away from the
+constraint manifold can converge to a smooth but invalid trajectory. These are
+properties of the soft-penalty optimization paradigm, not of any single
+implementation.
+
+Our approach decouples constraint satisfaction from the optimizer objective.
+Before optimization, we construct multiple seed families that stay near the
+level manifold by interpolating positions and goal-relative level-preserving
+orientations, then selecting continuous IK branches. After optimization, a hard
+validator decides success independently of optimizer status and ranks valid
+candidates with level satisfaction first. The same pipeline also produces
+training data for a learned seeding branch, but the learning component remains
+inside a verified fallback contract: learned candidates are proposals, and they
+must still be repaired, validated, and replaced by the rule branch if they fail.
+
+This paper makes three contributions:
+\begin{enumerate}
+  \item A decoupled constraint-satisfaction paradigm for orientation-path
+  manipulation planning, combining manifold-aware pre-seeding with a hard
+  post-verification gate. All first-party quantitative evidence is from
+  traceable SR5 repository artifacts.
+  \item A fallback-safe learned-seeding architecture in which the planning
+  pipeline acts as executor, labeled-data generator, and verifier with rule
+  fallback. The guarantee is an additive-budget fallback floor, not a
+  fixed-budget dominance claim.
+  \item A falsifiable fixed-budget evaluation of learned seed efficiency. On
+  the current held-out SR5 test split, learned methods are not shown superior to
+  the rule branch; we therefore report the result as negative diagnostics and a
+  baseline for future learned-seeding work.
+\end{enumerate}
 
 \begin{figure}[t]
 \centering
@@ -224,7 +259,7 @@ post-optimization verifier before any trajectory is counted as successful.
 \section{System Design}
 \label{sec:method}
 
-\subsection{Overview: A Verified Self-Improving Loop}
+\subsection{Overview: A Verified Fallback Loop}
 \label{sec:system-overview}
 % Pipeline as executor, labeled-data generator, and verifier with fallback.
 The system is organized around one invariant: no trajectory is treated as
@@ -312,7 +347,7 @@ optimizer failure, or fallback recovery. The learning problem is therefore not
 to imitate an optimal trajectory in isolation, but to learn which seed
 distributions are repairable by the verified downstream pipeline.
 
-\subsection{Self-Improving Closed Loop}
+\subsection{Fallback-Safe Learned-Seeding Loop}
 \label{sec:closedloop}
 % Diffusion seed model learns p(tau_seed | q_s, T_g, O, C); success critic
 % predicts (P_success, alignment risk, collision risk, opt cost); every learned

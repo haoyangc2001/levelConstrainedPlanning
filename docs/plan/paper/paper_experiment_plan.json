@@ -1123,8 +1123,8 @@
         {
           "id": "E8w",
           "description": "最后写 Intro (I) + Abstract，并去 cuRobo 化标题：四段式 Intro + 重写摘要去 3 处 CuRobo、去标题 CuRobo Repair。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "E1w",
             "E2w",
@@ -1143,7 +1143,8 @@
             "docs/paper/main.tex"
           ],
           "uncertainty": "贡献 (2)(3) 措辞取决于 C4/E2 结果；约束 scope 取决于 C1b。",
-          "review_change": "审查：E8w 把措辞纪律从只管贡献(3)扩到贡献(1)provenance (去44→92/prior标注)+贡献(2)self-improving以证据为门+约束scope随C1b收窄。"
+          "review_change": "审查：E8w 把措辞纪律从只管贡献(3)扩到贡献(1)provenance (去44→92/prior标注)+贡献(2)self-improving以证据为门+约束scope随C1b收窄。",
+          "implementation_note": "Completed on 2026-07-20. Rewrote title to 'Manifold-Aware Seeding with Verified Fallback for Orientation-Constrained Manipulation Planning'. Abstract now avoids CuRobo and frames learned seeding as a falsifiable efficiency hypothesis after C4 NOT_SHOWN_SUPERIOR. Introduction now follows the four-part structure: motivation, soft-penalty structural limitations without naming any optimizer implementation, decoupled seed+hard-gate method with fallback-safe learned seeding, and three honest contributions. Also downgraded System Design subsection headings from Self-Improving to Verified/Fallback-Safe language. Checked title/abstract/intro/problem contain no CuRobo/curobo or self-improving wording; no CR7 or old hardware numbers were introduced."
         },
         {
           "id": "E9w",
