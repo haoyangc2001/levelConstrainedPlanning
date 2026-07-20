@@ -1,0 +1,49 @@
+{
+  "schema_version": "d6_real_robot_scope.v1",
+  "created_at": "2026-07-20",
+  "task_id": "D6",
+  "decision": "prior_validation_only",
+  "new_hardware_experiment": {
+    "status": "not_executed",
+    "reason": "The current repository has no trajectory execution bridge from the planned joint trajectory to an SR5 controller.",
+    "current_repo_evidence": [
+      {
+        "path": "level_planner_ros/planner_node.py",
+        "finding": "ROS adapter exposes one Trigger service that calls LevelConstrainedPlanner.plan and writes result files; AST audit found create_service=1, create_publisher=0, create_client=0, publish=0, send_goal=0."
+      },
+      {
+        "path": "docs/guides/ros_adapter.md",
+        "finding": "The adapter guide states that motion, RViz, vision, scanner, gripper, and state-machine nodes are outside this adapter."
+      },
+      {
+        "path": "docs/guides/runtime.md",
+        "finding": "Runtime requests are validation jobs, not direct execution commands."
+      }
+    ]
+  },
+  "old_project_evidence": {
+    "status": "external_prior_only",
+    "paths_checked": [
+      "/home/caohy/repositories/tashan_Manipulation/readCaohy/plans/diffusionSeedLearning/single_trajectory_smoke_report.json",
+      "/home/caohy/repositories/tashan_Manipulation/resource/config/Level_Test_V2_caohy/start.launch.yaml",
+      "/home/caohy/repositories/tashan_Manipulation/src/curobo_v2_planner/curobo_v2_planner/main.py"
+    ],
+    "finding": "The old-project safety audit passes default safety guards, but the smoke report status is not_executed_template_and_safety_audit_only and single_trajectory_smoke.executed is false.",
+    "paper_use": "May be cited only as prior validation or engineering background if the old project is explicitly referenced; do not count it as a first-party result of this repository."
+  },
+  "paper_implication": {
+    "e4_status": "prior_validation_only",
+    "allowed_claim": "The same SR5 platform had prior safety-guarded validation in earlier work.",
+    "disallowed_claims": [
+      "This paper executed a new 20/20 or 18/20 real-robot trial.",
+      "This repository contains a complete SR5 trajectory execution bridge.",
+      "Learned diffusion candidates were executed on the real robot."
+    ],
+    "required_before_new_hardware": [
+      "Implement an explicit low-speed trajectory execution bridge or action client.",
+      "Add a human-confirmed safety checklist covering speed limits, emergency stop, workspace limits, collision pre-stop, and personnel separation.",
+      "Run a single manually selected plan-only trajectory through simulation/preview before hardware.",
+      "Record controller feedback, final pose tolerance, full-path level tolerance, collision status, and joint tracking error."
+    ]
+  }
+}

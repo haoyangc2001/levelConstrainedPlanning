@@ -884,10 +884,10 @@
         {
           "id": "D6",
           "description": "E4 实机：先决 scope——复用旧硬件证据 (20/20, 18/20，诚实标注 log 在旧项目) 或跑新硬件试验 (须先建轨迹下发桥)。若硬件/时间不可得，E4 以『既往验证』呈现。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
-            "D3"
+            "D1"
           ],
           "details": [
             "选项 (i) 复用旧硬件证据承载论文：**必须标注为 prior validation of the same SR5 platform in earlier work + 旧项目引用，不得作为本文第一方『我们做了 20/20』结果** (无本仓 artifact)。",
@@ -896,10 +896,13 @@
             "计划兜底允许以『既往验证』呈现，但按 E7w/E8w 标 prior + 引用，不进第一方结果表。"
           ],
           "files": [
+            "reports/d6_real_robot_scope.json",
+            "reports/d6_real_robot_scope.md",
             "level_planner_ros/planner_node.py (若走新硬件)"
           ],
           "uncertainty": "高——硬件可得性 + 无执行桥。",
-          "review_change": "审查：D6 明确旧 20/20 只能标 prior validation + 引用 (非第一方)；走新硬件须附实机安全 checklist。"
+          "review_change": "审查：D6 明确旧 20/20 只能标 prior validation + 引用 (非第一方)；走新硬件须附实机安全 checklist。",
+          "implementation_note": "Completed as a scope decision on 2026-07-20. New hardware execution is not run: the current repository ROS adapter is plan-only (Trigger service -> LevelConstrainedPlanner.plan -> result files) and has no publisher/client/action-goal execution bridge. Old-project safety evidence exists only as external prior validation; its single_trajectory_smoke_report status is not_executed_template_and_safety_audit_only with executed=false. E4 must therefore be written as prior validation / engineering background only, not as a first-party real-robot result."
         },
         {
           "id": "D7",
