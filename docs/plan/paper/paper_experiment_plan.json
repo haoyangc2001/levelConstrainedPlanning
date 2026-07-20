@@ -720,8 +720,8 @@
         {
           "id": "D0",
           "description": "机器人：全 SR5 (已定，只需同步文档)：仿真与实机统一用 SR5 (6-DOF)，做单机器人论文，删除 CR7——省掉整机上线子任务、sim/real 一致。",
-          "status": "decided",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [],
           "details": [
             "同步 docs/paper/writing-guide.md:188 (把 sim=CR7(7-DOF), real=SR5(6-DOF) 改成 sim+real 均 SR5) 与本文档实验矩阵中的机器人列。",
@@ -731,7 +731,8 @@
           "files": [
             "docs/paper/writing-guide.md"
           ],
-          "uncertainty": "决策已定；writing-guide 文本同步尚未落笔 (登记为落实项)。"
+          "uncertainty": "无——决策已落地到 writing-guide。",
+          "implementation_note": "Completed 2026-07-20. docs/paper/writing-guide.md now states that simulation and real-robot discussion are unified on SR5 (6-DOF). Old CR7 44->92/100 and old SR5 20/20,18/20 hardware numbers are explicitly downgraded to prior/background evidence, not first-party paper results. E1/E2/E3 matrix rows now use SR5 and reflect the D1 HOLD fallback path."
         },
         {
           "id": "D1",

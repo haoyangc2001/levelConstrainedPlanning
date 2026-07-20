@@ -43,7 +43,7 @@
 - *Manifold-Aware Seeding with Verified Fallback: A Self-Improving Loop for Orientation-Constrained Manipulation Planning*
 - *Decoupling Constraint Satisfaction from Optimization: A Closed-Loop Learned-Seeding System for Level-Constrained Manipulation*
 
-**创新 A（基础，已验证）**：约束满足的"解耦"范式——把约束满足从"优化过程内的单一软惩罚"，拆成优化前（多种子族贴近流形，回应 Obs.2）+ 优化后（硬验收门，回应 Obs.1）。已实测（CR7 44→92/100；SR5 20/20、18/20）。可迁移到任意"soft-cost 优化器 + 硬约束需求"场景。
+**创新 A（基础，已验证）**：约束满足的"解耦"范式——把约束满足从"优化过程内的单一软惩罚"，拆成优化前（多种子族贴近流形，回应 Obs.2）+ 优化后（硬验收门，回应 Obs.1）。本文第一方证据统一来自 SR5 仿真/可追溯实验；旧 CR7 数字与旧 SR5 硬件记录只能作为 prior validation / 背景引用，不作为本文第一方定量结果。可迁移到任意"soft-cost 优化器 + 硬约束需求"场景。
 
 **创新 B（拔高）**：自进化闭环——把流水线的两个局限（串行 IK 慢 / 覆盖受人工规则族上限约束）转化为数据引擎。三个差异化设计：(1) 学习目标是"可修复种子分布"而非"最优轨迹分布"；(2) 失败是一等公民数据，喂独立 Success Critic 而非扩散模型；(3) 学习失败必然回退规则种子 → **引入学习永不低于规则基线（下界不退化）**。
 
@@ -137,8 +137,8 @@ VI.  Conclusion & Limitations
 
 三点，分别对应"已验证范式 / 闭环架构 / 可证伪假设"：
 
-1. **A decoupled paradigm** that moves constraint satisfaction out of the soft-penalty objective into manifold-aware pre-seeding and a hard post-verification gate, addressing two *structural* limitations of optimization-based planning (constraint degradation, initialization sensitivity) — validated on hardware (SR5: 20/20 obstacle-free, 18/20 cluttered) and in simulation (44→92 / 100).
-2. **A self-improving closed-loop system** in which the constraint pipeline serves simultaneously as executor, labeled-data generator, and verifier-with-fallback; a diffusion seeder learns the *repairable-seed distribution* while a success critic consumes failures — with an architectural guarantee that learning never degrades the verified success-rate lower bound.
+1. **A decoupled paradigm** that moves constraint satisfaction out of the soft-penalty objective into manifold-aware pre-seeding and a hard post-verification gate, addressing two *structural* limitations of optimization-based planning (constraint degradation, initialization sensitivity) — evaluated in first-party SR5 simulation with every reported number traceable to repository artifacts.
+2. **A verified closed-loop integration architecture** in which the constraint pipeline serves simultaneously as executor, labeled-data generator, and verifier-with-fallback; a diffusion seeder learns the *repairable-seed distribution* while a success critic consumes failures, and failed learned candidates return to a verified rule baseline.
 3. **A falsifiable hypothesis and initial baseline** for whether learned seeds cover the optimizer's convergence basin more efficiently than hand-designed rule seeds under a fixed time budget, with a full evaluation protocol and ablations.
 
 **写作纪律**：贡献 (1)(2) 有证据、说满；(3) 是假设+初步基线，**不要把"扩散超过规则"写成已完成结论**。审稿人会尊重这种诚实。
@@ -159,7 +159,7 @@ VI.  Conclusion & Limitations
 
 | 范式 | Baseline | 文献出处 | 对比要回答什么 |
 |---|---|---|---|
-| **优化器裸跑（软约束）** | cuRobo 原生种子 + 大 $\lambda_{level}$ | DiffusionSeeder/McVAMP | 前移+后验相对"纯软惩罚"的增益（规范化 CR7 44→92） |
+| **优化器裸跑（软约束）** | cuRobo 原生种子 + 大 $\lambda_{level}$ | DiffusionSeeder/McVAMP | 前移+后验相对"纯软惩罚"的增益（用本文 SR5 artifact 量化） |
 | **采样式约束规划（投影）** | McVAMP 或 cpRRTC / OMPL 约束 RRT-Connect | McVAMP/cpRRTC | 约束满足"理论最干净"的对照；换吞吐/覆盖是否值得 |
 | **单向学习种子** | DiffusionSeeder 式（扩散→cuRobo，无回退无 critic） | DiffusionSeeder | 证明"闭环+验收+回退"优于"单向 pipeline"——**最关键的对手** |
 | **纯采样规划（无约束基线）** | RRT-Connect / BIT* | 几乎所有论文 | 下限参照 |
@@ -185,7 +185,7 @@ VI.  Conclusion & Limitations
 - **约束类型分级**：借 McVAMP 的 **LP/LPO/PP/PPO** 命名 + **TSR** 表达。我们的"保持水平"= 约束 roll/pitch、放开 yaw/z 的 TSR，属 PPO/LPO 类。
 - **障碍密度扫描**（cpRRTC/McVAMP 通用）：无障碍 → 稀疏 → 密集（窄通道），每档 **100 个随机 start-goal**（文献标准样本量）。
 - **真实端水任务**（借 IKLink 焊接/拧螺丝/关阀 + MPD Panda Shelf 的末端保向代价）：对应端托盘/焊接，做实机 demo。
-- **机器人**：仿真 CR7(7-DOF)，实机 SR5(6-DOF)。实机精简到最强 1–2 个 baseline。
+- **机器人**：仿真与实机统一为 SR5 (6-DOF)。CR7 不作为本文实验机器人；旧 CR7 数字只可作为历史背景，不可进入本文第一方结果表。
 
 ### 5.6 纵向消融（内部，证明每个组件有用 + 下界不退化）
 
@@ -203,10 +203,10 @@ VI.  Conclusion & Limitations
 
 | 实验 | 方法集 | 场景 | 主指标 | 对应论点 | 状态 |
 |---|---|---|---|---|---|
-| E1 横向-仿真 | 完整闭环 vs cuRobo原生 / McVAMP / 单向学习 / RRT-Connect | CR7，LP/LPO/PP/PPO × 障碍密度，各100对 | 成功率+约束误差+时间分位 | 系统整体优越性 | 待补 |
-| E2 时间预算曲线 | 完整闭环 vs 单向学习 vs 规则 | CR7 密集障碍 | Success@K vs 100ms/300ms/1s | 创新B核心假设 | 待补（假设） |
-| E3 消融 | 内部6档 + 时间匹配对照 | CR7 混合 | 成功率单调链 + VAR多样性 | 下界不退化 + 各组件贡献 | 待补 |
-| E4 实机 | 完整闭环 vs 最强1-2 baseline | SR5 端水/焊接，无障碍+多障碍 | 成功率（20/20、18/20 已有） | 工程可信度 | 部分已有 |
+| E1 横向-仿真 | 完整闭环 vs cuRobo原生 / McVAMP / 单向学习 / RRT-Connect | SR5，keep-level × 障碍密度；若全约束类未落地则不声称 LP/LPO/PP/PPO 全矩阵 | 成功率+约束误差+时间分位 | 系统整体优越性 | 待补 |
+| E2 时间预算曲线 | 完整闭环 vs 单向学习 vs 规则 | SR5 密集障碍或 keep-level test 子集 | Success@K vs compute budget / time budget | 创新B核心假设 | C4 未证优于规则，按 fallback 叙事处理 |
+| E3 消融 | 内部档 + 时间匹配对照 | SR5 混合 | 成功率链 + VAR多样性 | 组件贡献 / 负面诊断 | D1 HOLD 后默认不做全量重算 |
+| E4 实机 | 完整闭环 vs 最强1-2 baseline | SR5 端水/焊接，无障碍+多障碍 | 成功率 + 关节跟踪误差 | 工程可信度 | 旧 20/20、18/20 只能作 prior validation，不作本文第一方结果 |
 
 **诚实分层**：E1/E4（创新 A + 系统）写成已验证结论；E2/E3（创新 B）写成"假设 + 初步基线 + 完整协议"。E2 的核心假设——"固定预算下扩散 K 条种子能否比规则种子更高效覆盖收敛域"——目前**尚未拿到正面结果**。
 
