@@ -405,29 +405,41 @@ execution bridge to an SR5 controller. Any old SR5 hardware logs are therefore
 described only as prior validation of the same platform in earlier work, not as
 first-party real-robot trials from this paper.
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
-\fbox{\parbox{0.92\linewidth}{\centering Fig.~4 placeholder: Success@K vs compute budget with Wilson intervals.}}
-\caption{Success@K under matched compute budgets (placeholder).}
+\includegraphics[width=0.82\textwidth]{fig4_success_at_k.png}
+\caption{Success@K under the matched C4 solve-call budget. Error bars show Wilson 95\% intervals.}
 \label{fig:success-at-k}
-\end{figure}
+\end{figure*}
 
-\begin{table}[t]
-\caption{Component ablation and fallback diagnostics (placeholder).}
+\begin{table*}[t]
+\caption{C4 fixed-budget ablation and fallback diagnostics on the held-out SR5 test split.}
 \label{tab:main}
 \centering
-\begin{tabular}{lcc}
+\scriptsize
+\begin{tabular}{lccccc}
 \toprule
-Method & Success rate & Mean solve time (s) \\
+Method & Success@6 & Wilson 95\% CI & P50 latency (ms) & P98 latency (ms) & C4 verdict \\
 \midrule
-CuRobo native (no seed) & -- & -- \\
-Rule seeds + CuRobo + selection & -- & -- \\
-Diffusion seeds only & -- & -- \\
-Diffusion + critic & -- & -- \\
-Mixed fallback & -- & -- \\
+Rule only & 0.222 & [0.199, 0.246] & 5.0 & 13.5 & Reference \\
+Diffusion only & 0.000 & [0.000, 0.003] & 186.3 & 232.5 & Not shown superior \\
+Diffusion + critic & 0.000 & [0.000, 0.003] & 201.5 & 244.7 & Not shown superior \\
+Mixed fallback & 0.228 & [0.205, 0.253] & 1488.4 & 2648.9 & Not shown superior \\
 \bottomrule
 \end{tabular}
-\end{table}
+\vspace{0.3em}
+\parbox{0.95\textwidth}{\footnotesize Budget is six optimizer repair calls per request.
+The pre-registered C4 rule declares learned superiority only when the success
+delta is positive, the paired McNemar test is significant, and Wilson intervals
+are disjoint. Mixed fallback has a small positive point delta but overlapping
+intervals; pure learned branches have zero hard-valid successes.}
+\end{table*}
+
+The C4 result does not support the claim that learned seeds outperform the
+verified rule branch under a matched compute budget. We therefore use these
+numbers as negative diagnostics for the closed-loop architecture: fallback
+preserves an engineering integration path, but fixed-budget learned superiority
+remains an unproven hypothesis.
 
 \section{Conclusion}
 \label{sec:conclusion}

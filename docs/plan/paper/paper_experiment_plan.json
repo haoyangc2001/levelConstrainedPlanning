@@ -1097,8 +1097,8 @@
         {
           "id": "E7w",
           "description": "填 Experiments 数字 + Fig.4 + 表 I/II 量化格 (阻断于 D)：用 D 的 paper_result 渲图填表。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "E6w",
             "E3w",
@@ -1111,10 +1111,14 @@
           ],
           "files": [
             "docs/paper/main.tex",
-            "A4.3 图表生成器"
+            "tools/paper/draw_fig4_success.py",
+            "docs/paper/figures/fig4_success_at_k.png",
+            "reports/d7_paper_assets/fig4_success_at_k.json",
+            "reports/d7_c4_paper_results.jsonl"
           ],
           "uncertainty": "阻断于 D (而 D 依赖 A/B/C)。",
-          "review_change": "审查：E7w 去 CR7 重核 (仅 SR5)；Fig.4/Table 加 CI 与预算语义标注。"
+          "review_change": "审查：E7w 去 CR7 重核 (仅 SR5)；Fig.4/Table 加 CI 与预算语义标注。",
+          "implementation_note": "Completed on 2026-07-20 under the D1 HOLD fallback branch. Added tools/paper/draw_fig4_success.py to render docs/paper/figures/fig4_success_at_k.png from reports/d7_paper_assets/fig4_success_at_k.json because matplotlib/LaTeX plotting tools are unavailable. main.tex now includes Fig.4 and Table II with C4 fixed solve-call budget K=6 numbers: rule_only Success@6=0.222 [0.199,0.246], diffusion_only=0.000 [0.000,0.003], diffusion+critic=0.000 [0.000,0.003], mixed_fallback=0.228 [0.205,0.253]. Table notes the pre-registered C4 verdict: all learned methods are NOT_SHOWN_SUPERIOR; mixed_fallback's positive point delta has overlapping Wilson intervals. Full D3/D4/D5 quant tables remain descoped by HOLD."
         },
         {
           "id": "E8w",
