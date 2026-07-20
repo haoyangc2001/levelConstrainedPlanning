@@ -1076,8 +1076,8 @@
         {
           "id": "E6w",
           "description": "起草 Experiments 非数字部分 (V)——D 跑的同时写。此处才点名 cuRobo 作为优化器实例。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "E0"
           ],
@@ -1091,7 +1091,8 @@
             "docs/paper/main.tex"
           ],
           "uncertainty": "无 (数字格留 TODO)。",
-          "review_change": "审查：E6w 新增统计方法段 (≥3 种子/Wilson CI/McNemar/预注册显著性判据) + 预算语义段；诚实分层从只覆盖(3)扩到同时覆盖(2)下界措辞。"
+          "review_change": "审查：E6w 新增统计方法段 (≥3 种子/Wilson CI/McNemar/预注册显著性判据) + 预算语义段；诚实分层从只覆盖(3)扩到同时覆盖(2)下界措辞。",
+          "implementation_note": "Completed on 2026-07-20. Filled Experiments non-numeric protocol in docs/paper/main.tex: SR5 simulation with cuRobo as the batch optimizer instance, shared hard-validation harness, internal branches (rule_only/diffusion_only/diffusion+critic/mixed_fallback), external baseline categories, metrics, additive vs fixed wall-clock vs fixed solve-call budget semantics, Wilson CI + paired McNemar statistical protocol, and conservative real-robot scope. Numeric cells/Fig.4 remain for E7w."
         },
         {
           "id": "E7w",

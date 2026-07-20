@@ -353,6 +353,57 @@ optimizer's convergence basins more efficiently must be tested.
 % Main metric: success rate after CuRobo repair + hard validation under a fixed
 % total time budget. Ablations: rule-only vs diffusion-only vs diffusion+critic
 % vs mixed fallback. Report SR5 real-robot and simulation stress tests.
+We evaluate the system on the SR5 manipulator in simulation, instantiating the
+batch optimizer with cuRobo. All methods are evaluated through the same
+closed-loop harness: a method may propose seeds or invoke an optimizer, but a
+trial is counted as successful only when the selected trajectory passes the hard
+validator for terminal goal tolerance, full-path level tolerance, continuity,
+joint limits, motion-quality proxies, and world collision. This shared gate is
+important because several baselines optimize soft costs or generate candidate
+seeds without guaranteeing the orientation-path constraint.
+
+\textbf{Methods.} The core internal comparison uses four branches. The
+\emph{rule-only} branch runs the verified manifold-aware seed constructor and
+optimizer repair. The \emph{diffusion-only} branch replaces rule seeds with
+learned diffusion seeds and has no fallback. The \emph{diffusion+critic} branch
+orders learned candidates with the success critic before repair. The
+\emph{mixed-fallback} branch tries the learned path but falls back to the
+verified rule branch when no learned candidate passes. External comparisons are
+organized by planning paradigm: unconstrained or soft-cost trajectory
+optimization, projection-based constrained planning, sampling baselines, and
+one-way learned seeding.
+
+\textbf{Metrics.} The primary metric is fixed-budget success rate after hard
+validation. We also report Success@K, full-path alignment error distributions,
+alignment violation rate, world-collision status, latency p50/p75/p95/p98,
+motion-time and jerk proxies, and diversity/coverage diagnostics when the
+candidate set exposes them. For projection-based constrained planners, which
+typically treat constraint satisfaction as binary, we report both binary success
+and continuous alignment-error distributions to make the trade-off explicit.
+
+\textbf{Budget semantics.} We separate three budget regimes. In an
+\emph{additive} regime, learned candidates may be tried first and the rule branch
+can still be invoked afterward; this is the regime where fallback gives a rule
+success-rate floor. In a \emph{fixed wall-clock} regime, learned sampling and
+critic evaluation consume time that could otherwise be spent on rule or
+optimizer attempts. In a \emph{fixed solve-call} regime, each optimizer repair
+call is counted as compute budget. Success@K and Fig.~\ref{fig:success-at-k}
+are therefore interpreted only under their stated budget semantics.
+
+\textbf{Statistical protocol.} Each reported simulation cell is repeated across
+independent random seeds. Success rates are reported with Wilson confidence
+intervals, and paired method comparisons use per-problem outcomes so McNemar
+tests can be applied without losing the pairing structure. The pre-registered
+claim that learned seeds outperform the rule baseline requires a positive
+effect size, a significant paired test, and non-overlapping confidence intervals;
+otherwise the result is reported as a negative or diagnostic outcome rather than
+as learned superiority.
+
+\textbf{Real-robot scope.} This paper treats real-robot evidence conservatively.
+The current repository contains a planning ROS adapter, but no trajectory
+execution bridge to an SR5 controller. Any old SR5 hardware logs are therefore
+described only as prior validation of the same platform in earlier work, not as
+first-party real-robot trials from this paper.
 
 \begin{figure}[t]
 \centering
