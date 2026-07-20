@@ -995,8 +995,8 @@
         {
           "id": "E2w",
           "description": "起草 Problem Formulation & Structural Limitations (III)：约束轨迹优化模型 + 流形视角 + Observation 1 (约束退化) / Observation 2 (初值敏感)，保持范式级不点名 cuRobo。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "E0"
           ],
@@ -1008,7 +1008,8 @@
           "files": [
             "docs/paper/main.tex"
           ],
-          "uncertainty": "无。"
+          "uncertainty": "无。",
+          "implementation_note": "Completed on 2026-07-20. Filled Problem Formulation and Structural Limitations with trajectory variables, task constraints, eq:problem-constraints, the existing single level constraint eq:level, manifold/IK-branch difficulty, and Observation 1/2. The section contains no CuRobo/curobo mention and frames the limitations as properties of soft-penalty non-convex optimization."
         },
         {
           "id": "E3w",

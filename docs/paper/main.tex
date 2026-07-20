@@ -128,6 +128,24 @@ Ours & -- & -- & -- & -- \\
 %   level path constraint z_ee(q_k)^T z_w >= cos(eps) for all k;
 %   joint limits; velocity/acceleration; collision d(q_k, O) >= d_safe;
 %   joint-space continuity ||q_{k+1} - q_k|| <= dq_max.
+We consider a manipulator with $n$ joints and a trajectory
+$P=\{\qvec_0,\ldots,\qvec_N\}$, where each waypoint
+$\qvec_k\in\mathbb{R}^n$ is a joint configuration. A request specifies the
+start configuration $\qvec_s$, a terminal tool pose $\Tgoal$, a workspace
+obstacle set $\mathcal{O}$, and an orientation-path constraint that must hold
+over the full trajectory, not only at the terminal pose. The optimizer's nominal
+objective combines smoothness and regularization terms, while the task-level
+constraints require
+\begin{align}
+  \qvec_0 &= \qvec_s, &
+  T_{\mathrm{ee}}(\qvec_N) &\approx \Tgoal, \nonumber\\
+  \qvec_k &\in [\qvec_{\min},\qvec_{\max}], &
+  d(\qvec_k,\mathcal{O}) &\ge d_{\mathrm{safe}},
+  \label{eq:problem-constraints}
+\end{align}
+along with bounded joint-space continuity and motion-quality proxies such as
+velocity, acceleration, and jerk.
+
 The level constraint at each waypoint is expressed as
 \begin{equation}
   \zee(\qvec_k)^\top \zw \ge \cos\epsilon, \qquad k = 0,1,\dots,N,
@@ -136,6 +154,30 @@ The level constraint at each waypoint is expressed as
 where $\zee(\qvec_k)$ is the tool axis and $\zw$ the target world direction.
 % Observation 1: soft-penalty constraint degradation.
 % Observation 2: non-convex initialization sensitivity.
+Eq.~\eqref{eq:level} defines an orientation-path feasible set embedded inside
+joint space. When a task constrains one or more tool axes over the entire path,
+the feasible set behaves like a thin manifold rather than a full-dimensional
+volume. This creates two coupled difficulties. First, random or generic seeds
+are unlikely to lie near the manifold. Second, inverse kinematics is
+multi-valued: neighboring tool poses can be realized by different joint
+branches, so a path that is continuous in task space can still jump in joint
+space.
+
+\textbf{Observation 1 (Constraint degradation).} When a path constraint is
+encoded only as a weighted penalty in a scalar objective, a local optimum can
+reduce total cost while violating the constraint, because constraint
+satisfaction is traded against smoothness, goal, collision, and regularization
+terms.
+
+\textbf{Observation 2 (Initialization sensitivity).} For a non-convex objective
+solved by local descent, the returned trajectory is confined to the basin of its
+initial seed. A seed far from the level manifold can converge to a locally
+smooth but constraint-violating trajectory.
+
+These observations motivate the system design in Sec.~\ref{sec:method}. Rather
+than relying on a single objective weight to enforce the level path constraint,
+we construct seeds near the manifold before optimization and apply a hard
+post-optimization verifier before any trajectory is counted as successful.
 
 \section{System Design}
 \label{sec:method}
