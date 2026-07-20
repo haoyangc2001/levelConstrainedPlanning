@@ -972,8 +972,8 @@
         {
           "id": "E1w",
           "description": "起草 Method / System Design (IV，两个创新)——最高置信、不受 D 阻断，最先写。本节用『批量轨迹优化器』，不点名 cuRobo。",
-          "status": "pending",
-          "completed": false,
+          "status": "done",
+          "completed": true,
           "depends_on": [
             "E0"
           ],
@@ -989,7 +989,8 @@
             "docs/paper/main.tex"
           ],
           "uncertainty": "无——基于已有设计与代码。",
-          "review_change": "审查：E1w 下界句加预算语义限定 (additive-budget floor，非无条件 never degrades)；单调链先声明预算语义。"
+          "review_change": "审查：E1w 下界句加预算语义限定 (additive-budget floor，非无条件 never degrades)；单调链先声明预算语义。",
+          "implementation_note": "Completed on 2026-07-20. Filled docs/paper/main.tex System Design IV-A..IV-D with verified-loop overview, decoupled pre-seeding/post-verification, rule planner as data engine, diffusion+critic learned branch, and the fallback budget semantics. The section uses generic batch/underlying optimizer wording and contains no CuRobo/curobo mention; the lower-bound language is explicitly limited to additive budget, while fixed wall-clock/solve-call budget is framed as an empirical efficiency trade-off."
         },
         {
           "id": "E2w",

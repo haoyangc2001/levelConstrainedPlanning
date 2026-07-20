@@ -143,6 +143,25 @@ where $\zee(\qvec_k)$ is the tool axis and $\zw$ the target world direction.
 \subsection{Overview: A Verified Self-Improving Loop}
 \label{sec:system-overview}
 % Pipeline as executor, labeled-data generator, and verifier with fallback.
+The system is organized around one invariant: no trajectory is treated as
+executable until it has passed the same hard validation gate. The online planner
+therefore has three roles. First, it is an executor-facing planner that receives
+a start configuration, a goal pose, a world description, and a level constraint.
+Second, it is a data generator: every seed, optimizer return code, validation
+failure, fallback recovery, and selected trajectory is serialized as a labeled
+run artifact. Third, it is a verifier with fallback: learned proposals are never
+used directly, but are repaired by the optimizer and then accepted or rejected
+by the same hard gate as rule-generated proposals.
+
+Fig.~\ref{fig:system} summarizes this loop. A request first enters the
+manifold-aware seed generator, which produces several candidate joint-space
+paths near the level manifold. A batch optimizer then refines each seed within
+its local basin. The hard validator checks the returned candidates for path
+alignment, terminal goal accuracy, continuity, joint limits, dimensioned motion
+quality, and world collision. The selector ranks only valid candidates, with
+alignment validity as the first key. If the learned branch produces no valid
+candidate, the system falls back to the verified rule branch and records the
+failure for the next dataset version.
 
 \begin{figure*}[t]
 \centering
@@ -158,6 +177,35 @@ where $\zee(\qvec_k)$ is the tool axis and $\zw$ the target world direction.
 % branch-consistent IK selection minimizing joint jump + trend + goal-anchor +
 % limit-margin costs; smoothed / bridged variants; segmented optimization.
 % Batch optimizer repair; level-first hard gate and selection.
+The decoupling step moves level satisfaction out of a single soft penalty and
+into two explicit stages: pre-optimization seed construction and post-
+optimization verification. This targets the two structural limitations from
+Sec.~\ref{sec:problem}. The pre-seeding stage addresses initialization
+sensitivity by placing the optimizer near the level manifold before local
+descent begins. The hard gate addresses constraint degradation by refusing to
+equate optimizer convergence with task success.
+
+For each request, the rule seed constructor interpolates the Cartesian position
+from the start tool pose to the goal while restricting the orientation path to a
+level-preserving family. Let $Q_g$ be the target orientation and let $T_y(\theta)$
+denote a twist about the tool axis that preserves the level direction. The
+candidate orientation sequence is parameterized as
+$Q_i = Q_g T_y(\theta_i)$, where different schedules for $\theta_i$ form a
+small family of goal-relative level paths. Each waypoint is then mapped to joint
+space by inverse kinematics. Because the same end-effector pose can have
+multiple IK branches, the constructor chooses a branch sequence by minimizing a
+joint-space cost that penalizes jumps from the previous waypoint, trend
+reversals, distance from a goal-anchor solution, and proximity to joint limits.
+The raw path is supplemented with smoothed and bridge-repaired variants so the
+optimizer receives multiple nearby basins rather than a single brittle seed.
+
+The batch optimizer is used only as a repair and refinement operator. It
+receives seed trajectories and returns candidate paths, but the downstream gate
+defines success. The selector first discards candidates whose hard validator
+fails. Among valid candidates it uses a level-first ordering: smaller maximum
+alignment deviation, smaller start-joint gap, smaller joint-step jump, smoother
+twist evolution, and finally lower path cost. This ordering keeps the task
+constraint ahead of secondary smoothness or objective values.
 
 \begin{figure}[t]
 \centering
@@ -170,13 +218,51 @@ where $\zee(\qvec_k)$ is the tool axis and $\zw$ the target world direction.
 \label{sec:data-engine}
 % Planner limitations become data-engine motivation: serial IK cost and manually
 % bounded rule coverage; every run emits labeled success/failure artifacts.
+The rule branch is reliable but not free. Its IK search is serial along the
+path, and its coverage is bounded by manually designed orientation schedules and
+branch-selection heuristics. These limitations are exactly what make the planner
+useful as a data engine. Every successful run provides a repairable seed and a
+validated trajectory. Every failed run provides a structured counterexample:
+alignment failure, joint discontinuity, collision, motion-quality violation,
+optimizer failure, or fallback recovery. The learning problem is therefore not
+to imitate an optimal trajectory in isolation, but to learn which seed
+distributions are repairable by the verified downstream pipeline.
 
 \subsection{Self-Improving Closed Loop}
 \label{sec:closedloop}
 % Diffusion seed model learns p(tau_seed | q_s, T_g, O, C); success critic
 % predicts (P_success, alignment risk, collision risk, opt cost); every learned
-% candidate returns to CuRobo repair + hard validation; failures fall back to
+% candidate returns to optimizer repair + hard validation; failures fall back to
 % rule seeds; all outcomes feed the next dataset version.
+The learned branch models a conditional distribution over seed trajectories,
+$p(\tau_{\mathrm{seed}}\mid \qvec_s,\Tgoal,\mathcal{O},\mathcal{C})$, where
+$\mathcal{O}$ is the obstacle description and $\mathcal{C}$ is the active
+constraint class. The diffusion model operates in normalized joint-trajectory
+space and is trained on repairable examples rather than on all optimizer
+outputs. Its loss combines trajectory reconstruction with level-aware terms, so
+generated seeds are encouraged to stay near the same orientation-path manifold
+used by the rule branch. At inference time, multiple independent denoising
+samples provide a candidate set that can cover several local basins.
+
+Failures are not mixed into the diffusion target. A failed trajectory can be
+informative, but treating it as a positive demonstration would increase the
+probability of sampling invalid seeds. Instead, failures train a success critic
+that predicts whether a generated seed is likely to repair successfully and
+estimates risks such as alignment error, collision exposure, and optimizer
+effort. The critic is a filter and ordering module: it selects which learned
+candidates spend repair budget first, while the hard gate remains the final
+authority.
+
+The fallback contract separates safety from efficiency. Under an additive
+budget, the system can try learned candidates first and then invoke the verified
+rule branch if none pass; in that budget semantics, learning provides an
+opportunity for improvement without removing the rule baseline floor. Under a
+fixed wall-clock or fixed solve-call budget, the learned attempt consumes budget
+and can trade off against the rule branch. We therefore report fixed-budget
+success as an empirical efficiency question rather than as a guaranteed lower
+bound. This distinction is central to the paper narrative: the architecture is
+verified and fallback-safe, while the hypothesis that learned seeds cover the
+optimizer's convergence basins more efficiently must be tested.
 
 \section{Experiments}
 \label{sec:experiments}
